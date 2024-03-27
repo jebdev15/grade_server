@@ -12,6 +12,18 @@ const startConnection = async () => {
   } catch (error) {
     console.error(`ERRDB. - ${error.message}`);
   }
+  // try {
+  //   const conn = await mysql.createPool({
+  //     host: "192.168.101.4",
+  //     database: "sisdatabase2",
+  //     user: "ict",
+  //     password: "%%ChM$u@Dm1n**",
+  //   });
+  //   console.log(" Database Connected.");
+  //   return conn;
+  // } catch (error) {
+  //   console.error(`ERRDB. - ${error.message}`);
+  // }
 };
 
 const endConnection = async (conn) => {

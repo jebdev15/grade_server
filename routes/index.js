@@ -16,6 +16,23 @@ router.get("/login", async (req, res) => {
   res.status(200).json(rows);
 });
 
+router.get('/getCurrentSchoolYear', async (req, res) => {
+  const { getYear } = req.query;
+  // const data = getYear === "currentYearSetBySystem" ? 2022 : 1970;
+  // res.status(200).json({"currentYearSetBySystem": data})
+if(getYear === "currentYearSetBySystem"){
+  const conn = await startConnection();
+  try {
+    const [rows] = await conn.query("SELECT * FROM registrar_activity");
+    await endConnection(conn);
+    res.status(200).json(rows);
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json(err.message);
+  }
+}
+})
+
 router.get("/getLoad", async (req, res) => {
   const { faculty_id, school_year, semester, class_code } = req.query;
   const conn = await startConnection();
