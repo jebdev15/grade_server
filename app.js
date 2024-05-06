@@ -5,6 +5,7 @@ const logger = require("morgan");
 const cors = require("cors");
 const indexRouter = require("./routes");
 const viewingRouter = require("./routes/viewing");
+const adminRouter = require("./routes/admin");
 var debug = require("debug")("server");
 const app = express();
 
@@ -16,8 +17,9 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
-app.use("/", indexRouter);
-app.use("/viewing", viewingRouter);
+app.use("/", indexRouter); // Index Router that starts with forward slash('/') followed by /login, /getClassStudents, /getClassCodeDetails, /getCurrentSchoolYear, /getLoad
+app.use("/viewing", viewingRouter); //Viewing Router that starts with forward slash('/viewing') followed by /login, and /getGrades
+app.use("/admin", adminRouter); /* Viewing Router that starts with forward slash('/admin') followed by /getCurrentSchedule, /getEmails, /getSubjectLoad, /gradeSubmissionLogs, /downloadLogs, /updateClassCodeStatus, /updateSchedule */
 
 app.set("port", process.env.PORT || 3001);
 
