@@ -11,7 +11,7 @@ router.get("/login", async (req, res) => {
   const conn = await startConnection();
   const { email } = req.query;
   const [rows] = await conn.query(
-    `SELECT faculty_id, role FROM emails WHERE email = '${email}'`
+    `SELECT faculty_id, accessLevel FROM emails WHERE email = '${email}'`
   );
   await endConnection(conn);
   res.status(200).json(rows);
@@ -48,6 +48,8 @@ router.get('/getClassStudents', async (req, res) => {
       WHERE 
         class_code = '${decode.classCode}'
       AND 
+        sg.subject_code = c.subject_code 
+      AND
         sg.school_year = '${decode.currentSchoolYear}' 
       AND 
         sg.semester = '${decode.semester}' 
@@ -142,12 +144,10 @@ router.get("/getLoad", async (req, res) => {
     INNER JOIN section s USING (section_id)
     INNER JOIN student_load sl USING (class_code)
  
-    WHERE faculty_id = '${urlDecode(faculty_id)}' AND 
-    school_year = ${urlDecode(school_year)}  AND 
-    semester = '${urlDecode(semester)}'
+    WHERE faculty_id = ? AND school_year = ? AND semester = ?
      ${
        class_code ? `AND class_code = ${urlDecode(class_code)}` : ""
-     }  GROUP BY c.class_code ORDER BY section`
+     }  GROUP BY c.class_code ORDER BY section`, [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester)]
     );
     await endConnection(conn);
     res.status(200).json(rows);
@@ -183,7 +183,9 @@ router.get("/getGradeTable", async (req, res) => {
         USING (student_id)
       INNER JOIN student_grades sg
         USING (student_id)
-      WHERE class_code = '${decode.classCode}'AND 
+      WHERE 
+        c.class_code = '${decode.classCode}'AND 
+        sg.subject_code = c.subject_code AND
         sg.school_year = '${decode.currentSchoolYear}' AND 
         sg.semester = '${decode.semester}' 
       GROUP BY name
@@ -209,26 +211,34 @@ router.get("/getExcelFile", async (req, res) => {
   const conn = await startConnection();
 
   const [data] = await conn.query(
-    `SELECT c.subject_code, sg.student_grades_id, s.student_id, CONCAT(s.student_lastname , ', ', s.student_firstname) as name, sg.mid_grade, sg.final_grade, sg.remarks
-  FROM class c 
-  INNER JOIN student_load sl
-    USING (class_code) 
-  INNER JOIN student s 
-    USING (student_id)
-  INNER JOIN student_grades sg
-    USING (student_id)
-  WHERE class_code = '${decode.classCode}'AND 
-  sg.school_year = '${decode.currentSchoolYear}' AND 
-  sg.semester = '${decode.semester}' 
-  GROUP BY name
-  ORDER BY name`
+    `SELECT 
+      c.subject_code, 
+      sg.student_grades_id, 
+      s.student_id, 
+      CONCAT(s.student_lastname , ', ', s.student_firstname) as name, 
+      sg.mid_grade, 
+      sg.final_grade, 
+      sg.remarks
+    FROM class c 
+    INNER JOIN student_load sl
+      USING (class_code) 
+    INNER JOIN student s 
+      USING (student_id)
+    INNER JOIN student_grades sg
+      USING (student_id)
+    WHERE 
+      c.class_code = '${decode.classCode}'AND 
+      sg.subject_code = c.subject_code AND
+      sg.school_year = '${decode.currentSchoolYear}' AND 
+      sg.semester = '${decode.semester}' 
+    GROUP BY name
+    ORDER BY name`
   );
   await endConnection(conn);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "CHMSU Grading System";
   workbook.created = new Date();
   workbook.calcProperties.fullCalcOnLoad = true;
-
   const sheet = workbook.addWorksheet(decode.classCode, {
     pageSetup: {
       fitToPage: true,
@@ -243,6 +253,7 @@ router.get("/getExcelFile", async (req, res) => {
       },
     },
   });
+  
 
   //HEADER
   sheet.mergeCells("A1", "H1");

@@ -15,36 +15,11 @@ const startConnection = async () => {
   } catch (error) {
     console.error(`ERRDB. - ${error.message}`);
   }
-  
-  // connected to syndicateadmin_testsisdb
-  // try {
-  //   const conn = await mysql.createPool({
-  //     host: "92.204.139.146",
-  //     database: "syndicateadmin_testsisdb",
-  //     user: "syndicateadmin_testsisdb",
-  //     password: "KV^K$J7Wu$qY",
-  //   });
-  //   console.log("Cloud Test Database Connected.");
-  //   return conn;
-  // } catch (error) {
-  //   console.error(`ERRDB. - ${error.message}`);
-  // }
-  // try {
-  //   const conn = await mysql.createPool({
-  //     host: "192.168.101.4",
-  //     database: "sisdatabase2",
-  //     user: "ict",
-  //     password: "%%ChM$u@Dm1n**",
-  //   });
-  //   console.log(" Database Connected.");
-  //   return conn;
-  // } catch (error) {
-  //   console.error(`ERRDB. - ${error.message}`);
-  // }
 };
 
 const endConnection = async (conn) => {
   await conn.end();
+  console.log('Connection Closed.');
 };
 
 module.exports = {
