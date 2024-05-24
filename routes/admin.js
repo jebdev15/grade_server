@@ -7,6 +7,9 @@ const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
 const { urlDecode } = require('url-encode-base64')
 
+// router.get('/checkAccessLevel', async (req, res) => {
+  
+// })
 
 router.get('/getCurrentSchedule', async (req, res) => {
     const conn = await startConnection();
@@ -46,12 +49,16 @@ router.get('/getEmails', async (req, res) => {
 
 router.get("/getSubjectLoad", async (req, res) => {
     const { faculty_id, school_year, semester, class_code } = req.query;
-    const decodedURL = {
-      faculty_id: urlDecode(faculty_id),
-      school_year: urlDecode(school_year),
-      semester: urlDecode(semester),
-      class_code: urlDecode(class_code),
-    }
+    // const decodedURL = {
+    //   faculty_id: urlDecode(faculty_id),
+    //   school_year: urlDecode(school_year),
+    //   semester: urlDecode(semester),
+    //   class_code: urlDecode(class_code),
+    // }
+    const decodedParams = Object.values(req.query).map((param) => urlDecode(param))
+    console.log(decodedParams);
+    const params = class_code ? [decodedParams[0], decodedParams[1], decodedParams[2], decodedParams[3]] : [decodedParams[0], decodedParams[1], decodedParams[2]];
+    const sqlParams = class_code ? `AND class_code = ?` : "";
     const conn = await startConnection();
     try {
       const [rows] = await conn.query(
@@ -64,10 +71,8 @@ router.get("/getSubjectLoad", async (req, res) => {
       INNER JOIN section s USING (section_id)
       INNER JOIN student_load sl USING (class_code)
       WHERE c.faculty_id = ? AND c.school_year = ? AND c.semester = ?
-       ${
-         class_code ? `AND class_code = ?` : ""
-       }  GROUP BY c.class_code ORDER BY section`,
-       [decodedURL.faculty_id, decodedURL.school_year, decodedURL.semester, class_code && decodedURL.class_code]
+       ${sqlParams} GROUP BY c.class_code ORDER BY section`,
+       params
       );
       await endConnection(conn);
       res.status(200).json(rows);

@@ -14,6 +14,9 @@ router.get("/login", async (req, res) => {
     `SELECT faculty_id, accessLevel FROM emails WHERE email = '${email}'`
   );
   await endConnection(conn);
+  const url = rows[0].accessLevel==="Administrator" || rows[0].accessLevel==="Registrar" ? "/admin" : "/home"
+  rows.push({url})
+  console.log(rows);
   res.status(200).json(rows);
 });
 
