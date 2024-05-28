@@ -4,7 +4,7 @@ const { startConnection, endConnection } = require("../config/conn");
 
 router.get("/login", async (req, res) => {
   const { studentID, password } = req.query;
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   const [row] = await conn.query(
     "SELECT * FROM student WHERE student_id = ? LIMIT 1",
     [studentID]
@@ -43,7 +43,7 @@ router.get("/login", async (req, res) => {
 });
 router.get("/getGrades", async (req, res) => {
   const { studentID } = req.query;
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   const [gradeRows] = await conn.query(
     "SELECT * FROM student_grades WHERE student_id = ?",
     [studentID]

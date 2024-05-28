@@ -6,9 +6,10 @@ const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
 const { urlDecode } = require('url-encode-base64')
+// require('dotenv').config();
 
 router.get("/login", async (req, res) => {
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   const { email } = req.query;
   const [rows] = await conn.query(
     `SELECT faculty_id, accessLevel FROM emails WHERE email = '${email}'`
@@ -27,7 +28,7 @@ router.get('/getClassStudents', async (req, res) => {
     semester: urlDecode(semester),
     currentSchoolYear: urlDecode(currentSchoolYear),
   }
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   try {
     const [rows] = await conn.query(
       `
@@ -73,7 +74,7 @@ router.get('/getClassCodeDetails', async (req, res) => {
     class_code: urlDecode(class_code),
   }
   
-      const conn = await startConnection();
+      const conn = await startConnection(req);
       try {
         const [rows] = await conn.query(`SELECT  
                                           CONCAT(f.lastname,' ',f.firstname) as instructor,
@@ -118,7 +119,7 @@ router.get('/getClassCodeDetails', async (req, res) => {
 })
 
 router.get('/getCurrentSchoolYear', async (req, res) => {
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   try {
     const [rows] = await conn.query("SELECT * FROM registrar_activity");
     await endConnection(conn);
@@ -132,7 +133,7 @@ router.get('/getCurrentSchoolYear', async (req, res) => {
 
 router.get("/getLoad", async (req, res) => {
   const { faculty_id, school_year, semester, class_code } = req.query;
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   try {
     const [rows] = await conn.query(
       `SELECT
@@ -168,7 +169,7 @@ router.get("/getGradeTable", async (req, res) => {
     currentSchoolYear: urlDecode(currentSchoolYear),
   };
 
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   try {
     const [rows] = await conn.query(
       `SELECT 
@@ -211,7 +212,7 @@ router.get("/getExcelFile", async (req, res) => {
     semester: urlDecode(semester),
     currentSchoolYear: urlDecode(currentSchoolYear),
   }
-  const conn = await startConnection();
+  const conn = await startConnection(req);
 
   const [data] = await conn.query(
     `SELECT 
@@ -476,7 +477,7 @@ router.get("/getExcelFile", async (req, res) => {
 });
 
 router.post("/updateGrade", async (req, res) => {
-  const conn = await startConnection();
+  const conn = await startConnection(req);
   const countAffectedRows = async (grade) => {
     const { sg_id, mid_grade, final_grade, dbRemark, average, status } = grade;
 
@@ -564,7 +565,7 @@ router.post(
         ];
       };
 
-      const conn = await startConnection();
+      const conn = await startConnection(req);
       const [rows, fields] = await conn.query(
         "SELECT subject_code FROM class WHERE class_code = ?",
         [decodeClassCode]
