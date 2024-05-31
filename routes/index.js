@@ -6,19 +6,20 @@ const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
 const { urlDecode } = require('url-encode-base64')
-// require('dotenv').config();
 
 router.get("/login", async (req, res) => {
   const conn = await startConnection(req);
   const { email } = req.query;
-  const [rows] = await conn.query(
-    `SELECT faculty_id, accessLevel FROM emails WHERE email = '${email}'`
-  );
-  await endConnection(conn);
-  const url = rows[0].accessLevel==="Administrator" || rows[0].accessLevel==="Registrar" ? "/admin" : "/home"
-  rows.push({url})
-  console.log(rows);
-  res.status(200).json(rows);
+  try {
+    const [rows] = await conn.query(`SELECT faculty_id, accessLevel FROM emails WHERE email = ? AND status = ?`,[email, 1]);
+    const url = (rows[0].accessLevel==="Administrator" || rows[0].accessLevel==="Registrar") ? "/admin" : "/home"
+    rows.push({url})
+    res.status(200).json(rows);
+  } catch (error) {
+    res.status(401).json({ message: "Invalid Credentials", error: error.message, email });  
+  } finally {
+    await endConnection(conn);
+  }
 });
 
 router.get('/getClassStudents', async (req, res) => {
@@ -138,7 +139,7 @@ router.get("/getLoad", async (req, res) => {
     const [rows] = await conn.query(
       `SELECT
             c.class_code, 
-            c.isLock, 
+            c.status, 
             c.subject_code,
             CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
             COUNT(DISTINCT student_id) as noStudents,
@@ -179,7 +180,7 @@ router.get("/getGradeTable", async (req, res) => {
         sg.mid_grade, 
         sg.final_grade, 
         sg.remarks as dbRemark,
-        c.isLock
+        c.status
       FROM class c 
       INNER JOIN student_load sl
         USING (class_code) 
@@ -458,7 +459,7 @@ router.get("/getExcelFile", async (req, res) => {
       ),
     };
     sheet.getCell(`G${currentRow}`).value = {
-      formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, IF(AVERAGE(D${currentRow}:E${currentRow}) > 75,                                                                                                                                                      "Passed", "Failed"), "")`,
+      formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, IF(AVERAGE(D${currentRow}:E${currentRow}) >= 75,                                                                                                                                                      "Passed", "Failed"), "")`,
       result: status,
     };
     sheet.getCell(`H${currentRow}`).dataValidation = {
