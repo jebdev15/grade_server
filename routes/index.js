@@ -6,6 +6,34 @@ const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
 const { urlDecode } = require('url-encode-base64')
+const mysql = require("mysql2/promise");
+require('dotenv').config();
+
+router.get('/connectionTest', async (req, res) => {
+  const FRONT_URLS = JSON.parse(process.env.FRONT_URLS);
+  const DB_CONFIGS = JSON.parse(process.env.DB_CONFIGS);
+  const dbConfig = DB_CONFIGS[2];
+  try {
+    const conn = await mysql.createPool({
+      host: dbConfig.host,
+      database: dbConfig.name,
+      user: dbConfig.user,
+      password: dbConfig.pass,
+    });
+    if(conn) {
+      // console.log("Database Connected.");
+      const [rows] = await conn.query('select * from emails')
+      console.log(rows)
+      res.send({message:"Database Connected.", "host": dbConfig.host, "database": dbConfig.name});
+      return conn;
+    } else {
+      console.log("Database Connection Failed.");
+    }
+  } catch (error) {
+    res.send(`ERRDB. - ${error.message}`)
+    console.error(`ERRDB. - ${error.message}`);
+  }
+})
 
 router.get("/login", async (req, res) => {
   const conn = await startConnection(req);

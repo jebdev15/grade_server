@@ -27,7 +27,7 @@ const startConnection = async (req) => {
       user: dbConfig.user,
       password: dbConfig.pass,
     });
-    console.log("Database Connected.");
+    // console.log("Database Connected.");
     return conn;
   } catch (error) {
     console.error(`ERRDB. - ${error.message}`);

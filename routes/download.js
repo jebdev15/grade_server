@@ -574,4 +574,201 @@ router.get('/downloadAccountLogs', async (req, res) => {
     }
 })
 
+router.get('/downloadDeadlineLogs', async (req, res) => {
+  const {toGenerate, schoolYear, semester} = req.query;
+  let currentSemester;
+    switch(semester) {
+      case "1st":
+        currentSemester = "First Semester";
+        break;
+      case "2nd":
+        currentSemester = "Second Semester";
+        break;
+      case "summer":
+        currentSemester = "Summer";
+        break;
+    }
+  const conn = await startConnection(req);
+  try {
+      const [rows] = await conn.query(`select * from deadline_log where schoolyear = ? and semester = ? order by timestamp desc`,[schoolYear, semester]);   
+      await endConnection(conn);   
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "CHMSU Grading System";
+      workbook.created = new Date();
+      workbook.calcProperties.fullCalcOnLoad = true;          
+      const sheet = workbook.addWorksheet("Logs", {
+          pageSetup: {
+            fitToPage: true,
+            orientation: "portrait",
+            margins: {
+              left: 0.5,
+              right: 0.5,
+              top: 0.5,
+              bottom: 0.5,
+              header: 0,
+              footer: 0,
+            },
+          },
+        });    
+      //HEADER
+      sheet.mergeCells("A1", "H1");
+      const republic = sheet.getCell("A1");
+      republic.value = "Republic of the Philippines";
+      republic.alignment = {
+          vertical: "middle",
+          horizontal: "center",
+      }; 
+      sheet.mergeCells("A2", "H2");
+      const nameofSchool = sheet.getCell("A2");
+      nameofSchool.value = "CARLOS HILADO MEMORIAL STATE UNIVERSITY";
+      nameofSchool.alignment = {
+        vertical: "middle",
+        horizontal: "center",
+      };
+      nameofSchool.font = {
+        size: 12,
+        bold: true,
+      };       
+      sheet.mergeCells("A3", "H3");
+      const campusInfo = sheet.getCell("A3");
+      campusInfo.value = "Main Campus, Talisay City, Negros Occidental";
+      campusInfo.alignment = {
+          vertical: "middle",
+          horizontal: "center",
+      };
+      const logoPic = workbook.addImage({
+          filename: `${__dirname}/../public/images/logo.png`,
+          extension: "png",
+      });
+      sheet.addImage(logoPic, {
+          tl: {
+              col: 1,
+              row: 1,
+          },
+          ext: {
+              width: 100,
+              height: 100,
+          },
+      });
+      sheet.mergeCells("A5", "H5");
+      const officeOfReg = sheet.getCell("A5");
+      officeOfReg.value = "Office of the Registrar";
+      officeOfReg.alignment = {
+          vertical: "middle",
+          horizontal: "center",
+      };
+      officeOfReg.font = {
+          size: 12,
+          bold: true,
+      };
+      
+      sheet.mergeCells("A6", "H6");
+      const gradeSheetTitle = sheet.getCell("A6");
+      gradeSheetTitle.alignment = {
+          vertical: "middle",
+          horizontal: "center",
+      };
+      gradeSheetTitle.value=toGenerate;
+
+      sheet.mergeCells("A7", "H7");
+      const academicYear = sheet.getCell("A7");
+      academicYear.alignment = {
+          vertical: "middle",
+          horizontal: "center",
+      };
+      academicYear.value=`Academic Year ${schoolYear} - ${parseInt(schoolYear) + 1}, ${currentSemester}`
+
+      sheet.getRow(9).values = [
+          'Email Used',
+          'Activity',
+          'School Year',
+          'Semester',
+          'Status',
+          'From',
+          'To',
+          'Timestamp',
+      ]
+      sheet.getRow(9).font = {
+          bold: true,
+          size: 13,
+      };
+
+      sheet.columns = [
+          { key: 'email_used', width: 20 },
+          { key: 'activity', width: 15 },
+          { key: 'schoolyear', width: 25 },
+          { key: 'semester', width: 25 },
+          { key: 'status', width: 15 },
+          { key: 'from', width: 15 },
+          { key: 'to', width: 15 },
+          { key: 'timestamp', width: 25, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
+      ]
+
+      const dateFormatter = (date) => {
+        const newDateTime = new Date(date);
+    
+        const formattedDate = newDateTime.toLocaleString("en-PH", {
+          month: "long", // Full month name
+          day: "numeric", // Day of the month
+          year: "numeric", // Full year
+          hour: "numeric", // Display Hour/s
+          minute: "numeric", // Display Minute/s
+        });
+    
+        return formattedDate;
+      };
+
+      const dateFormat = (date) => {
+        const newDateTime = new Date(date);
+    
+        const formattedDate = newDateTime.toLocaleString("en-PH", {
+          month: "long", // Full month name
+          day: "numeric", // Day of the month
+          year: "numeric", // Full year
+        });
+    
+        return formattedDate;
+      };
+
+      rows.forEach((item, i) => {
+          const {
+              email_used,
+              activity,
+              schoolyear, 
+              semester,
+              status,
+              from,
+              to,
+              timestamp
+          } = item;
+
+          const row = sheet.getRow(i + 10);
+          row.font = {
+              size: 13,
+          }
+
+          row.values = {
+              email_used,
+              activity,
+              schoolyear: `${schoolyear} - ${parseInt(schoolyear)+1}`, 
+              semester,
+              status,
+              from: dateFormat(from),
+              to: dateFormat(to),
+              timestamp: dateFormatter(timestamp)
+          }
+      })
+
+      res.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader("Content-Disposition", "attachment; filename=" + "File.xlsx");
+      workbook.xlsx.write(res).then(() => res.end());
+  } catch(err) {
+    res.status(500).json(err.message);
+    console.error(err.message);
+  }
+})
+
 module.exports = router

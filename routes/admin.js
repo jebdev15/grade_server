@@ -182,18 +182,8 @@ router.post('/updateClassStatus', async (req, res) => {
 })
 
 router.post('/updateSchedule', async (req, res) => {
-    let {activity, schoolyear, semester, status, from, to} = req.body;
-    // function getCurrentDateFormatted() {
-    //     const date = new Date();
-    //     const year = date.getFullYear();
-    //     const month = String(date.getMonth() + 1).padStart(2, '0');
-    //     const day = String(date.getDate()).padStart(2, '0');
-    
-    //     return `${year}-${month}-${day}`;
-    // }
-    // const currentDate = getCurrentDateFormatted();
-    // status = currentDate <= to ? 'Open': 'Close'
-    // console.log(status);
+    let {email_used, activity, schoolyear, semester, status, from, to} = req.body;
+    let response = {};
     const conn = await startConnection(req);
     try {
         const [rows] = await conn.query(
@@ -203,20 +193,27 @@ router.post('/updateSchedule', async (req, res) => {
           const [rows2] = await conn.query('UPDATE registrar_activity SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
           [activity, schoolyear, semester, status, from ,to]
           );
-          console.log("Updated :", rows2.changedRows);
-          res.json({"updated": rows2.changedRows, "message": "Successfully Updated"})
+          if(rows2.changedRows > 0) {
+            const [deadlineLogs] = await conn.query("INSERT INTO deadline_log(email_used, activity, schoolyear, semester, status, `from`, `to`) VALUES(?, ?, ?, ?, ?, ?, ?)", [email_used, activity, schoolyear, semester, status, from, to]);
+            response = deadlineLogs.affectedRows > 0 ? {"success": true, "message": "Successfully Updated"} : {"success": false, "message": "Successfully Updated"}
+          } else {
+            response = {hasChanges: false, "message": "Successfully Update"}
+          }
         } else {
-          const [rows2] = await conn.query(
+          await conn.query(
               'INSERT INTO registrar_activity VALUES(?, ?, ?, ?, ?, ?)',
               [activity, schoolyear, semester, status, from ,to]
           );
-          console.log("Inserted :", rows2.affectedRows);
-          res.json({"updated": rows2.affectedRows, "message": "Successfully Updated"})
+          response = {"updated": false, "message": "Successfully Updated"}
         } 
-        await endConnection(conn);
     } catch(err) {
+        response = {"error": true, "message": err.message}
         console.error(err.message);
+    } finally {
+      await endConnection(conn);
     }
+    console.log(response);
+    res.json(response)
 })
 
 
@@ -227,16 +224,16 @@ router.post('/createUser', async (req, res) => {
     facultyId = accessLevel === 'Registrar' ? accessLevel : facultyId;
     const conn = await startConnection(req);
     try {
-      const [rows] = await conn.query(`SELECT * FROM emails WHERE email = ? OR faculty_id = ?`, [emailAddress, facultyId]);
+      const [rows] = await conn.query(`SELECT * FROM emails WHERE email = ?`, [emailAddress]);
       if(rows.length < 1) {
         const [rows2] = await conn.query(`INSERT INTO emails(faculty_id, email, accessLevel) VALUES(?,?,?)`, [facultyId, emailAddress, accessLevel]);
         await conn.query(`INSERT INTO email_logs(email_used, new_faculty_id, new_email, new_accessLevel, new_status, action_type) VALUES(?,?,?,?,?,?)`, [emailUsed, facultyId, emailAddress, accessLevel, 1, 'create']);
         response = rows2.affectedRows > 0 && {"success": 1, message:"Successfully Created"}
       } else {
-        response = {"success": 0, message: "Email or Faculty has an existing User Account"}
+        response = {"success": 0, message: "Email has been used"}
       }
     } catch(err) {
-      response = {"success": 0, message: "Unable to Create. Please contact the Administrator"}
+      response = {"success": 0, message: "Unable to Create."}
       console.error(err.message);
     } finally {
       await endConnection(conn);
@@ -359,6 +356,21 @@ router.post('/getAccountDetails', async (req, res) => {
   } finally {
     await endConnection(conn);
   }
+})
+
+router.post('/setDeadlineLogs', async (req, res) => {
+  const { email_used, activity, schoolyear, sem, from, to } = req.body;
+  const conn = await startConnection(req);
+  let response = {};
+  try {
+    const [rows] = await conn.query(`INSERT INTO tbl_deadline_logs(email_used, activity, schoolyear, sem, from_date, to_date) VALUES(?, ?, ?, ?, ?, ?)`, [email_used, activity, schoolyear, sem, from, to]);
+    response = rows.affectedRows > 0 ? {"message": "Successfully Updated"} : {"message": "Successfully Update"}
+  } catch(err) {
+    response = {"message": "", "error": err.message}
+  } finally {
+    await endConnection(conn);
+  }
+  res.json(response)
 })
 
 module.exports = router;
