@@ -6,48 +6,30 @@ const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
 const { urlDecode } = require('url-encode-base64')
-const mysql = require("mysql2/promise");
-require('dotenv').config();
-
-router.get('/connectionTest', async (req, res) => {
-  const FRONT_URLS = JSON.parse(process.env.FRONT_URLS);
-  const DB_CONFIGS = JSON.parse(process.env.DB_CONFIGS);
-  const dbConfig = DB_CONFIGS[2];
-  try {
-    const conn = await mysql.createPool({
-      host: dbConfig.host,
-      database: dbConfig.name,
-      user: dbConfig.user,
-      password: dbConfig.pass,
-    });
-    if(conn) {
-      // console.log("Database Connected.");
-      const [rows] = await conn.query('select * from emails')
-      console.log(rows)
-      res.send({message:"Database Connected.", "host": dbConfig.host, "database": dbConfig.name});
-      return conn;
-    } else {
-      console.log("Database Connection Failed.");
-    }
-  } catch (error) {
-    res.send(`ERRDB. - ${error.message}`)
-    console.error(`ERRDB. - ${error.message}`);
-  }
-})
 
 router.get("/login", async (req, res) => {
   const conn = await startConnection(req);
   const { email } = req.query;
+  let status;
+  let response;
   try {
     const [rows] = await conn.query(`SELECT faculty_id, accessLevel FROM emails WHERE email = ? AND status = ?`,[email, 1]);
-    const url = (rows[0].accessLevel==="Administrator" || rows[0].accessLevel==="Registrar") ? "/admin" : "/home"
-    rows.push({url})
-    res.status(200).json(rows);
+    if(rows.length > 0) {
+      const url = (rows[0].accessLevel==="Administrator" || rows[0].accessLevel==="Registrar") ? "/admin" : "/home"
+      rows.push({url})
+      status = 200;
+      response = rows;
+    } else {
+      status = 401;
+      response = {message: "Invalid Credentials", email};
+    }
   } catch (error) {
-    res.status(401).json({ message: "Invalid Credentials", error: error.message, email });  
+    status = 500;
+    response = {message: error.message, email};
   } finally {
     await endConnection(conn);
   }
+  res.status(status).json(response)
 });
 
 router.get('/getClassStudents', async (req, res) => {
@@ -62,10 +44,11 @@ router.get('/getClassStudents', async (req, res) => {
     const [rows] = await conn.query(
       `
       SELECT 
+        sg.student_id as studentID,
         CONCAT(s.student_lastname , ', ', s.student_firstname) as studentName, 
-        sg.mid_grade as midTermGrade, 
-        sg.final_grade as endTermGrade, 
-        sg.grade as finalGrade, 
+        CASE WHEN sg.mid_grade = 0 THEN '' ELSE FORMAT(sg.mid_grade,0) END as midTermGrade, 
+        CASE WHEN sg.final_grade = 0 THEN '' ELSE FORMAT(sg.final_grade,0) END as endTermGrade, 
+        CASE WHEN sg.grade = 0 THEN '' ELSE FORMAT(sg.grade, 0) END as finalGrade, 
         sg.remarks
       FROM 
         class c 
@@ -162,6 +145,8 @@ router.get('/getCurrentSchoolYear', async (req, res) => {
 
 router.get("/getLoad", async (req, res) => {
   const { faculty_id, school_year, semester, class_code } = req.query;
+  const query = class_code ? `AND class_code = ?` : "" 
+  const params = class_code ? [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester), urlDecode(class_code)] : [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester)]
   const conn = await startConnection(req);
   try {
     const [rows] = await conn.query(
@@ -178,9 +163,7 @@ router.get("/getLoad", async (req, res) => {
     INNER JOIN student_load sl USING (class_code)
  
     WHERE faculty_id = ? AND school_year = ? AND semester = ?
-     ${
-       class_code ? `AND class_code = ${urlDecode(class_code)}` : ""
-     }  GROUP BY c.class_code ORDER BY section`, [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester)]
+     ${query} GROUP BY c.class_code ORDER BY section`, params
     );
     await endConnection(conn);
     res.status(200).json(rows);
@@ -205,8 +188,8 @@ router.get("/getGradeTable", async (req, res) => {
         sg.student_grades_id as sg_id, 
         s.student_id, 
         CONCAT(s.student_lastname , ', ', s.student_firstname) as name, 
-        sg.mid_grade, 
-        sg.final_grade, 
+        CASE WHEN sg.mid_grade = 0 THEN '' ELSE FORMAT(sg.mid_grade,0) END as mid_grade, 
+        CASE WHEN sg.final_grade = 0 THEN '' ELSE FORMAT(sg.final_grade,0) END as final_grade, 
         sg.remarks as dbRemark,
         c.status
       FROM class c 
@@ -487,7 +470,7 @@ router.get("/getExcelFile", async (req, res) => {
       ),
     };
     sheet.getCell(`G${currentRow}`).value = {
-      formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, IF(AVERAGE(D${currentRow}:E${currentRow}) >= 75,                                                                                                                                                      "Passed", "Failed"), "")`,
+      formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, IF(ROUND(AVERAGE(D${currentRow}:E${currentRow}),0) >= 75,                                                                                                                                                      "Passed", "Failed"), "")`,
       result: status,
     };
     sheet.getCell(`H${currentRow}`).dataValidation = {
@@ -508,14 +491,14 @@ router.get("/getExcelFile", async (req, res) => {
 router.post("/updateGrade", async (req, res) => {
   const conn = await startConnection(req);
   const countAffectedRows = async (grade) => {
-    const { sg_id, mid_grade, final_grade, dbRemark, average, status } = grade;
+    let { sg_id, mid_grade, final_grade, dbRemark, average, status } = grade;
 
     try {
       const [rows] = await conn.query(
         "UPDATE student_grades SET mid_grade = ?, final_grade = ?, remarks = ?, grade = ? WHERE student_grades_id = ? ",
         [
-          mid_grade,
-          final_grade,
+          mid_grade=mid_grade === '' ? 0 : mid_grade,
+          final_grade=final_grade === '' ? 0 : final_grade,
           dbRemark || status.toLowerCase(),
           average,
           sg_id,
