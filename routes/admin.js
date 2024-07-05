@@ -5,71 +5,43 @@ const upload = multer({ dest: "./tmp/" });
 const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
-const { urlDecode } = require('url-encode-base64')
+const { urlDecode } = require('url-encode-base64');
+const { 
+  getEmails, 
+  getSubjectLoad, 
+  getAllEmails, 
+  getAllNoAccounts,
+  updateClassCodeStatus, 
+  insertClassCodeUpdateLog,
+  getGradeTableService, 
+} = require("../services/admin.services");
 
+// response to Index Component
 router.get('/getCurrentSchedule', async (req, res) => {
     const conn = await startConnection(req);
     try {
-      const [rows] = await conn.query(`select * from registrar_activity`);
-      res.json(rows)
-      await endConnection(conn);
+      const rows = getCurrentSchedule(conn);
+      res.status(200).json(rows)
     } catch(err) {
       console.error(err.message);
+    } finally {
+      await endConnection(conn);
     }
 })
 
+// response to GradeSubmission Component
 router.get('/getEmails', async (req, res) => {
     const conn = await startConnection(req);
     try {
-      const [rows] = await conn.query(
-        `select 
-        e.id,
-        f.lastname as lastName,
-        f.firstname as firstName,
-        e.email,
-        e.faculty_id,
-        e.accessLevel,
-        CASE WHEN e.status = 1 THEN 'Active' ELSE 'Inactive' END as status
-        from emails as e 
-        INNER JOIN faculty as f 
-        USING(faculty_id) 
-        GROUP BY e.id
-        ORDER BY f.lastname
-        `
-      );
-      res.json(rows)
-      await endConnection(conn);
+      const rows = await getEmails(conn);
+      res.status(200).json(rows)
     } catch(err) {
       console.error(err.message);
+    } finally {
+      await endConnection(conn);
     }
 })
-
-router.get('/getAllEmails', async (req, res) => {
-  const conn = await startConnection(req);
-  try {
-    const [rows] = await conn.query(
-      `select 
-      e.id,
-      f.lastname as lastName,
-      f.firstname as firstName,
-      e.email,
-      e.faculty_id,
-      e.accessLevel,
-      CASE WHEN e.status = 1 THEN 'Active' ELSE 'Deactivated' END as status
-      from emails as e 
-      LEFT JOIN faculty as f 
-      USING(faculty_id) 
-      GROUP BY e.id
-      ORDER BY e.id ASC
-      `
-    );
-    res.json(rows)
-    await endConnection(conn);
-  } catch(err) {
-    console.error(err.message);
-  }
-})
-
+// response to Eye Icon under GradeSubmission Component
 router.get("/getSubjectLoad", async (req, res) => {
     const { faculty_id, school_year, semester, class_code } = req.query;
     const decodedParams = Object.values(req.query).map((param) => urlDecode(param))
@@ -77,52 +49,62 @@ router.get("/getSubjectLoad", async (req, res) => {
     const sqlParams = class_code ? `AND class_code = ?` : "";
     const conn = await startConnection(req);
     try {
-      const [rows] = await conn.query(
-        `SELECT c.class_code as id, 
-              c.subject_code,
-              CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
-              COUNT(DISTINCT student_id) as noStudents,
-              c.status
-      FROM class c
-      INNER JOIN section s USING (section_id)
-      INNER JOIN student_load sl USING (class_code)
-      WHERE c.faculty_id = ? AND c.school_year = ? AND c.semester = ?
-       ${sqlParams} GROUP BY c.class_code ORDER BY section`,
-       params
-      );
-      await endConnection(conn);
+      const rows = await getSubjectLoad(conn, sqlParams, params);
       res.status(200).json(rows);
     } catch (err) {
       console.log(err.message);
       res.status(500).json(err.message);
+    } finally {
+      await endConnection(conn);
     }
 });
 
+router.get("/getGradeTable", async (req, res) => {
+  const { class_code } = req.query;
+  const decode = {
+    classCode: urlDecode(class_code),
+  };
+  const conn = await startConnection(req);
+  try {
+    const rows = await getGradeTableService(conn, decode);
+    console.log(rows.length);
+    res.status(200).json(rows);
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+});
 
+// response to Users Component
+router.get('/getAllEmails', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getAllEmails(conn);
+    res.status(200).json(rows)
+  } catch(err) {
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+// response to Reports Component
+// response to Grade Sheet Submission Logs Dropdown Report
 router.get('/getGradeSubmissionLogs', async (req, res) => {
     const {class_code} = req.query;
     const conn = await startConnection(req);
     try {
-      const [rows] = await conn.query(
-        `select
-          u.id,
-          u.timestamp,
-          u.method
-          from class c
-          inner join updates u
-          using(class_code)
-          where class_code = ?
-        `,
-        [urlDecode(class_code)]
-      );
+      const rows = getGradeSubmissionLogs(conn, class_code);
       res.status(200).json(rows)
-      await endConnection(conn);
     } catch(err) {
       res.status(500).json(err.message);
       console.error(err.message);
+    } finally {
+      await endConnection(conn);
     }
 })
-
 
 router.post('/updateClassCodeStatus', async (req, res) => {
     const {class_code, status, email_used} = req.body;
@@ -132,13 +114,10 @@ router.post('/updateClassCodeStatus', async (req, res) => {
     let response = {};
     const conn = await startConnection(req);
     try {
-        const [rows] = await conn.query(
-          `UPDATE class SET status = ? WHERE class_code = ?`,
-          [newStatus, classCodeDecode]
-        );
-
+        const rows = await updateClassCodeStatus(conn, newStatus, classCodeDecode);
+        console.log(rows);
         if(rows.changedRows > 0) {
-          const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code) VALUES(?, ?, ?)`, [email_used, newStatus ? 'Locked' : 'Unlocked', classCodeDecode ]);
+          const logClassStatus = await insertClassCodeUpdateLog(conn, email_used, newStatus, classCodeDecode);
           response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status"} : {"success": false ,"message": "Failed to Update"}
         } else {
           response = {"success": false ,"message": "Status Updated"}
@@ -149,6 +128,7 @@ router.post('/updateClassCodeStatus', async (req, res) => {
     } finally {
       await endConnection(conn);
     }
+    console.log(response);
     res.json(response)
 })
 
@@ -157,7 +137,7 @@ router.post('/updateClassStatus', async (req, res) => {
   let response = {};
   const conn = await startConnection(req);
   try {
-    const [rows] = await conn.query(`SELECT * FROM registrar_activity`);
+    const [rows] = await conn.query(`SELECT * FROM registrar_activity_online`);
     const [statusUpdate] = await conn.query('UPDATE class SET status=? WHERE school_year=? AND semester=?',[action === 'Lock' ? 1 : 0, rows[0].schoolyear, rows[0].semester]);
     if(statusUpdate.changedRows > 0) {
       const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code) VALUES(?, ?, ?)`, [email_used, action === 'Lock' ? 'Locked' : 'Unlocked', 'all']);
@@ -181,10 +161,10 @@ router.post('/updateSchedule', async (req, res) => {
     const conn = await startConnection(req);
     try {
         const [rows] = await conn.query(
-            `SELECT * FROM registrar_activity`
+            `SELECT * FROM registrar_activity_online`
         );
         if(rows.length > 0){
-          const [rows2] = await conn.query('UPDATE registrar_activity SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
+          const [rows2] = await conn.query('UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
           [activity, schoolyear, semester, status, from ,to]
           );
           if(rows2.changedRows > 0) {
@@ -195,7 +175,7 @@ router.post('/updateSchedule', async (req, res) => {
           }
         } else {
           await conn.query(
-              'INSERT INTO registrar_activity VALUES(?, ?, ?, ?, ?, ?)',
+              'INSERT INTO registrar_activity_online VALUES(?, ?, ?, ?, ?, ?)',
               [activity, schoolyear, semester, status, from ,to]
           );
           response = {"updated": false, "message": "Successfully Updated"}
@@ -209,7 +189,6 @@ router.post('/updateSchedule', async (req, res) => {
     console.log(response);
     res.json(response)
 })
-
 
 router.post('/createUser', async (req, res) => {
   let { emailAddress, facultyId, accessLevel, emailUsed } = req.body;
@@ -342,8 +321,8 @@ router.get('/getAccessLevels', async (req, res) => {
 router.get('/getAllNoAccounts', async (req, res) => {
   const conn = await startConnection(req);
   try{
-    let [rows] = await conn.query(`SELECT * FROM faculty WHERE faculty_id NOT IN(SELECT faculty_id FROM emails) AND faculty.status<>? ORDER BY faculty.lastname`,['deleted'])
-    rows = rows.length > 0 ? rows : [];
+    const data = await getAllNoAccounts(conn);
+    const rows = data.length > 0 ? data : [];
     res.json({"success": 1, "message": "OK", rows})
   }catch(err){
     res.json({"success": 0, "message": err.message, "rows": []})

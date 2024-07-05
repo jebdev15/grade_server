@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken')
 var debug = require("debug")("server");
 const app = express();
 
+app.enable('trust proxy')
 app.use(logger("dev"));
 app.use(cors());
 app.use(express.json());
@@ -27,8 +28,8 @@ app.use("/download", downloadRouter); // Allowing download of logs
 app.get('/checkToken', async (req, res) => {
   const uuid = uuidv4();
   const token = uuid;
-  const tokenSigned = jwt.sign({foo: 'bar'}, token, {algorithm: 'RS256'})
-  res.send({message: 'OK', token, tokenSigned})
+  const tokenSigned = jwt.sign({foo: 'bar'}, token)
+  res.send({message: 'OK', token, tokenSigned })
 })
 
 app.set("port", process.env.PORT || 3001);

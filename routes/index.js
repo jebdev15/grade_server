@@ -6,6 +6,18 @@ const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
 const { urlDecode } = require('url-encode-base64')
+const {
+  eventkeyUserEmailRef,
+  insertModifiedEventLog,
+  checkIfHasRemarkInGradeSheet
+} = require("../services/eventkey");
+const { getSingleSetOfData } = require("../utils/get-data.utils");
+const { 
+  getLoad,
+  getGradeTable,
+  getExcelFile,
+  getGraduateStudiesTable
+} = require("../services/index.services");
 
 router.get("/login", async (req, res) => {
   const conn = await startConnection(req);
@@ -32,7 +44,7 @@ router.get("/login", async (req, res) => {
   res.status(status).json(response)
 });
 
-router.get('/getClassStudents', async (req, res) => {
+router.get('/getClassGraduateStudiesStudents', async (req, res) => {
   const { class_code, semester, currentSchoolYear } = req.query;
   const decode = {
     classCode: urlDecode(class_code),
@@ -45,10 +57,10 @@ router.get('/getClassStudents', async (req, res) => {
       `
       SELECT 
         sg.student_id as studentID,
-        CONCAT(s.student_lastname , ', ', s.student_firstname) as studentName, 
-        CASE WHEN sg.mid_grade = 0 THEN '' ELSE FORMAT(sg.mid_grade,0) END as midTermGrade, 
-        CASE WHEN sg.final_grade = 0 THEN '' ELSE FORMAT(sg.final_grade,0) END as endTermGrade, 
-        CASE WHEN sg.grade = 0 THEN '' ELSE FORMAT(sg.grade, 0) END as finalGrade, 
+        CONCAT(s.student_lastname , ', ', s.student_firstname) as studentName,
+        sg.mid_grade as midTermGrade, 
+        sg.final_grade as endTermGrade,  
+        sg.grade as finalGrade, 
         sg.remarks
       FROM 
         class c 
@@ -78,6 +90,65 @@ router.get('/getClassStudents', async (req, res) => {
     res.status(500).json(error.message);
   }
 });
+
+router.get('/getClassStudents', async (req, res) => {
+  const { class_code, semester, currentSchoolYear } = req.query;
+  const decode = {
+    classCode: urlDecode(class_code),
+    semester: urlDecode(semester),
+    currentSchoolYear: urlDecode(currentSchoolYear),
+  }
+  const conn = await startConnection(req);
+  try {
+    const [rows] = await conn.query(
+      `
+      SELECT 
+        sg.student_id as studentID,
+        CONCAT(s.student_lastname , ', ', s.student_firstname) as studentName, 
+        CASE 
+          WHEN sg.mid_grade = 0 THEN '' 
+          WHEN sg.mid_grade BETWEEN 1 AND 3 THEN FORMAT(sg.mid_grade,2)
+          ELSE FORMAT(sg.mid_grade,0) 
+        END as midTermGrade, 
+        CASE 
+          WHEN sg.final_grade = 0 THEN '' 
+          WHEN sg.final_grade BETWEEN 1 AND 3 THEN FORMAT(sg.final_grade,2)
+          ELSE FORMAT(sg.final_grade,0) 
+        END as endTermGrade, 
+        CASE 
+          WHEN sg.grade = 0 THEN '' 
+          ELSE FORMAT(sg.grade, 0) 
+        END as finalGrade, 
+        sg.remarks
+      FROM 
+        class c 
+      INNER JOIN 
+        student_load sl
+      USING (class_code) 
+      INNER JOIN 
+        student s 
+      USING (student_id)
+      INNER JOIN 
+        student_grades sg
+      USING (student_id)
+      WHERE 
+        class_code = '${decode.classCode}'
+      AND 
+        sg.subject_code = c.subject_code 
+      AND
+        sg.school_year = '${decode.currentSchoolYear}' 
+      AND 
+        sg.semester = '${decode.semester}' 
+      GROUP BY studentName
+      ORDER BY studentName`
+    );
+    await endConnection(conn);
+    res.status(200).json(rows);
+  } catch (error) {
+    res.status(500).json(error.message);
+  }
+});
+
 router.get('/getClassCodeDetails', async (req, res) => {
   const { semester, currentSchoolYear, class_code } = req.query;
   const decode = {
@@ -133,15 +204,31 @@ router.get('/getClassCodeDetails', async (req, res) => {
 router.get('/getCurrentSchoolYear', async (req, res) => {
   const conn = await startConnection(req);
   try {
-    const [rows] = await conn.query("SELECT * FROM registrar_activity");
-    await endConnection(conn);
+    const [rows] = await conn.query("SELECT * FROM registrar_activity_online");
     res.status(200).json(rows);
   } catch (err) {
     console.log(err.message);
     res.status(500).json(err.message);
+  } finally {
+    await endConnection(conn);
   }
 })
 
+router.get('/getLastGradeSheetSubmittedLog', async (req, res) => {
+  const { class_code } = req.query;
+  const conn = await startConnection(req);
+  try {
+    const rows = await getSingleSetOfData(conn, 'tbl_class_update_logs', 'class_code', class_code);
+    const data = rows.length > 0 ? rows.reverse()[0] : '--'
+    const statusCode = rows.length > 0 ? 200 : 404
+    console.log(data);
+    res.status(statusCode).json(data);
+  } catch (error) {
+    res.status(500).json(error);
+  } finally {
+   await endConnection(conn); 
+  }
+})
 
 router.get("/getLoad", async (req, res) => {
   const { faculty_id, school_year, semester, class_code } = req.query;
@@ -149,31 +236,50 @@ router.get("/getLoad", async (req, res) => {
   const params = class_code ? [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester), urlDecode(class_code)] : [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester)]
   const conn = await startConnection(req);
   try {
-    const [rows] = await conn.query(
-      `SELECT
-            c.class_code, 
-            c.status, 
-            c.subject_code,
-            CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
-            COUNT(DISTINCT student_id) as noStudents,
-             (SELECT timestamp FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code ORDER BY id DESC LIMIT 1) as timestamp,
-             (SELECT method FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code ORDER BY id DESC LIMIT 1) as method
-    FROM class c
-    INNER JOIN section s USING (section_id)
-    INNER JOIN student_load sl USING (class_code)
- 
-    WHERE faculty_id = ? AND school_year = ? AND semester = ?
-     ${query} GROUP BY c.class_code ORDER BY section`, params
-    );
-    await endConnection(conn);
+    const rows = await getLoad(conn, query, params);
     res.status(200).json(rows);
   } catch (err) {
     console.log(err.message);
     res.status(500).json(err.message);
+  } finally {
+    await endConnection(conn);
   }
 });
 
 router.get("/getGradeTable", async (req, res) => {
+  const { class_code, semester, currentSchoolYear } = req.query;
+    const decode = {
+        classCode: urlDecode(class_code),
+        semester: urlDecode(semester),
+        currentSchoolYear: urlDecode(currentSchoolYear),
+    };
+
+    const conn = await startConnection(req);
+    try {
+        const rows = await getGradeTable(conn, decode);
+        res.status(200).json(rows);
+    } catch (err) {
+        console.log(err.message);
+        res.status(500).json(err.message);
+    } finally {
+        await endConnection(conn);
+    }
+});
+
+router.get("/getGraduateStudiesLoad", async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const [rows] = await conn.query("SELECT * FROM graduate_studies");
+    res.status(200).json(rows);
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+});
+
+router.get("/getGraduateStudiesTable", async (req, res) => {
   const { class_code, semester, currentSchoolYear } = req.query;
   const decode = {
     classCode: urlDecode(class_code),
@@ -183,36 +289,14 @@ router.get("/getGradeTable", async (req, res) => {
 
   const conn = await startConnection(req);
   try {
-    const [rows] = await conn.query(
-      `SELECT 
-        sg.student_grades_id as sg_id, 
-        s.student_id, 
-        CONCAT(s.student_lastname , ', ', s.student_firstname) as name, 
-        CASE WHEN sg.mid_grade = 0 THEN '' ELSE FORMAT(sg.mid_grade,0) END as mid_grade, 
-        CASE WHEN sg.final_grade = 0 THEN '' ELSE FORMAT(sg.final_grade,0) END as final_grade, 
-        sg.remarks as dbRemark,
-        c.status
-      FROM class c 
-      INNER JOIN student_load sl
-        USING (class_code) 
-      INNER JOIN student s 
-        USING (student_id)
-      INNER JOIN student_grades sg
-        USING (student_id)
-      WHERE 
-        c.class_code = '${decode.classCode}'AND 
-        sg.subject_code = c.subject_code AND
-        sg.school_year = '${decode.currentSchoolYear}' AND 
-        sg.semester = '${decode.semester}' 
-      GROUP BY name
-      ORDER BY name`
-    );
-    await endConnection(conn);
+    const rows = await getGraduateStudiesTable(conn, decode);
+    console.log(rows);
     res.status(200).json(rows);
   } catch (err) {
     console.log(err.message);
-
     res.status(500).json(err.message);
+  } finally {
+    await endConnection(conn);
   }
 });
 
@@ -225,31 +309,7 @@ router.get("/getExcelFile", async (req, res) => {
     currentSchoolYear: urlDecode(currentSchoolYear),
   }
   const conn = await startConnection(req);
-
-  const [data] = await conn.query(
-    `SELECT 
-      c.subject_code, 
-      sg.student_grades_id, 
-      s.student_id, 
-      CONCAT(s.student_lastname , ', ', s.student_firstname) as name, 
-      sg.mid_grade, 
-      sg.final_grade, 
-      sg.remarks
-    FROM class c 
-    INNER JOIN student_load sl
-      USING (class_code) 
-    INNER JOIN student s 
-      USING (student_id)
-    INNER JOIN student_grades sg
-      USING (student_id)
-    WHERE 
-      c.class_code = '${decode.classCode}'AND 
-      sg.subject_code = c.subject_code AND
-      sg.school_year = '${decode.currentSchoolYear}' AND 
-      sg.semester = '${decode.semester}' 
-    GROUP BY name
-    ORDER BY name`
-  );
+  const data = await getExcelFile(conn, decode)
   await endConnection(conn);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "CHMSU Grading System";
@@ -355,7 +415,7 @@ router.get("/getExcelFile", async (req, res) => {
   };
 
   const subject = sheet.getCell("A9")
-  subject.value = 'Subject:';
+  subject.value = `SUBJECT: ${data[0].subject_code}`;
   subject.font = {
     bold: true,
     size: 13,
@@ -369,7 +429,7 @@ router.get("/getExcelFile", async (req, res) => {
   // };
   
   const instructor = sheet.getCell("A10");
-  instructor.value = `Instructor: ${name}`;
+  instructor.value = `INSTRUCTOR: ${name}`;
   instructor.font = {
     bold: true,
     size: 13,
@@ -383,7 +443,7 @@ router.get("/getExcelFile", async (req, res) => {
   // };
 
   const sectionCode = sheet.getCell("E10");
-  sectionCode.value = decodeURI(classSection);
+  sectionCode.value = `CURR/ YR/ SEC: ${decodeURI(classSection)}`;
   sectionCode.font = {
     bold: true,
     size: 13,
@@ -463,14 +523,14 @@ router.get("/getExcelFile", async (req, res) => {
       status,
       remarks: remark,
     };
+    const ave = ((parseInt(item.mid_grade) + parseInt(item.final_grade)) / 2);
+    const average = (ave >= 1 && ave <= 5) ? ave : Math.round(ave);
     sheet.getCell(`F${currentRow}`).value = {
       formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, ROUND(AVERAGE(D${currentRow}:E${currentRow}), 0), "")`,
-      result: Math.round(
-        (parseInt(item.mid_grade) + parseInt(item.final_grade)) / 2
-      ),
+      result: average,
     };
     sheet.getCell(`G${currentRow}`).value = {
-      formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, IF(ROUND(AVERAGE(D${currentRow}:E${currentRow}),0) >= 75,                                                                                                                                                      "Passed", "Failed"), "")`,
+      formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, IF(ROUND(AVERAGE(D${currentRow}:E${currentRow}),0) >= 75, "Passed", "Failed"), "")`,
       result: status,
     };
     sheet.getCell(`H${currentRow}`).dataValidation = {
@@ -488,19 +548,27 @@ router.get("/getExcelFile", async (req, res) => {
   workbook.xlsx.write(res).then(() => res.end());
 });
 
-router.post("/updateGrade", async (req, res) => {
+router.post("/updateGraduateStudiesGrade", async (req, res) => {
   const conn = await startConnection(req);
-  const countAffectedRows = async (grade) => {
-    let { sg_id, mid_grade, final_grade, dbRemark, average, status } = grade;
-
+  const ipAddress = req.ip;
+  const { grades, class_code, method, email_used } = req.body;
+  // Get User Full Name using Email as Preference
+  const userName = await eventkeyUserEmailRef(conn, email_used);
+  const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", ipAddress);
+  const countAffectedRows = async (gradeData) => {
+    let { sg_id, mid_grade, end_grade, grade, dbRemark } = gradeData;
+    const identifyStatus = (grade >= 1 && grade <= 2) ? "Passed" : "Failed";
+    const status = identifyStatus.toLowerCase();
+    const remarks = (dbRemark.toLowerCase() !== "Passed" || dbRemark.toLowerCase() !== "Failed" || dbRemark.toLowerCase() !== "") ? dbRemark : status;
     try {
       const [rows] = await conn.query(
-        "UPDATE student_grades SET mid_grade = ?, final_grade = ?, remarks = ?, grade = ? WHERE student_grades_id = ? ",
+        "UPDATE student_grades,`subject` SET student_grades.mid_grade = ?, student_grades.final_grade = ?, student_grades.grade = ?, student_grades.remarks = ?, student_grades.credit = (`subject`.lec_units + `subject`.lab_units), student_grades.modified_eventkey = ? WHERE student_grades_id = ?",
         [
-          mid_grade=mid_grade === '' ? 0 : mid_grade,
-          final_grade=final_grade === '' ? 0 : final_grade,
-          dbRemark || status.toLowerCase(),
-          average,
+          mid_grade,
+          end_grade,
+          grade,
+          remarks,
+          modifiedEventKey,
           sg_id,
         ]
       );
@@ -514,7 +582,74 @@ router.post("/updateGrade", async (req, res) => {
     }
   };
 
-  const { grades, class_code, method } = req.body;
+  const decodeClassCode = urlDecode(class_code);
+  try {
+    const affectedRowsArr = await Promise.all(
+      grades.map(async (grade) => await countAffectedRows(grade))
+    );
+
+    const totalAffectedRows = affectedRowsArr.reduce(
+      (prev, current) => prev + current,
+      0
+    );
+    await conn.query("INSERT INTO updates (class_code, method) VALUES(?, ?)", [
+      decodeClassCode,
+      method,
+    ]);
+    await endConnection(conn);
+    res.status(200).json(totalAffectedRows);
+  } catch (error) {
+    if (error) console.log(error);
+    res.status(500).json(error.message);
+  }
+});
+
+router.post("/updateGrade", async (req, res) => {
+  const conn = await startConnection(req);
+  const ipAddress = req.ip;
+  const { grades, class_code, method, email_used } = req.body;
+
+  // Get User Full Name using Email as Preference
+  const userName = await eventkeyUserEmailRef(conn, email_used);
+  const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", ipAddress);
+  const countAffectedRows = async (grade) => {
+    let { sg_id, mid_grade, final_grade, dbRemark, status } = grade;
+    
+    const average = Math.round((parseInt(mid_grade) + parseInt(final_grade)) / 2);
+    
+    try {
+      const [rows] = await conn.query(
+        `UPDATE 
+          student_grades,
+          ${`subject`} 
+        SET 
+          student_grades.mid_grade = ?, 
+          student_grades.final_grade = ?, 
+          student_grades.remarks = ?, 
+          student_grades.grade = ?, 
+          student_grades.credit = (${`subject`}.lec_units + ${`subject`}.lab_units), 
+          student_grades.modified_eventkey = ? 
+        WHERE 
+          student_grades_id = ?`,
+        [
+          mid_grade=mid_grade === '' ? 0 : mid_grade,
+          final_grade=final_grade === '' ? 0 : final_grade,
+          dbRemark || status.toLowerCase(),
+          isNaN(average) ? 0 : average,
+          modifiedEventKey,
+          sg_id,
+        ]
+      );
+      await conn.execute(
+        "INSERT INTO grade_logs (student_grades_id, status) VALUES(?, ?)",
+        [sg_id, "NP"]
+      );
+      return rows.affectedRows;
+    } catch (err) {
+      console.error(err.message);
+    }
+  };
+
   const decodeClassCode = urlDecode(class_code);
   try {
     const affectedRowsArr = await Promise.all(
@@ -542,29 +677,25 @@ router.post(
   upload.single("uploadFile"),
   async (req, res) => {
     const uploadFile = req.file;
-    const { class_code, method } = req.body;
+    const { class_code, method, email_used } = req.body;
     const decodeClassCode = urlDecode(class_code);
   
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(uploadFile.path);
 
     const sheet = workbook.worksheets[0];
-
     const sheetName = sheet.name
-
     const updateDataContainer = [];
+
     let updatedData = (name, hasUpdated) => {
         updateDataContainer.push({name, hasUpdated})
-        // console.log(`name: ${name}, hasUpdated: ${hasUpdated}`);
     }
 
     let noUpdateData = (name, noUpdate) => {
       updateDataContainer.push({name, noUpdate})
-      // console.log(`name: ${name}, noUpdate: ${noUpdate}`);
     }
 
     if(sheetName === decodeClassCode) {
-
       const extractRowData = (row) => {
         return [
           row.values[1],
@@ -576,8 +707,10 @@ router.post(
           row.values[3],
         ];
       };
-
+      
       const conn = await startConnection(req);
+      const userName = await eventkeyUserEmailRef(conn, email_used);
+      const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", req.ip);
       const [rows, fields] = await conn.query(
         "SELECT subject_code FROM class WHERE class_code = ?",
         [decodeClassCode]
@@ -585,12 +718,8 @@ router.post(
       const subjectCode = rows[0].subject_code;
       const processRow = async (rowData, finalRemark) => {
         try {
-          const [rows, fields] = await conn.query(
-            "UPDATE student_grades SET mid_grade = ?, final_grade = ?, grade = ?, remarks = ? WHERE student_grades_id = ? AND subject_code = ?",
-            [rowData[1], rowData[2], rowData[3], finalRemark, rowData[0], subjectCode]
-          );
+           const rows = await checkIfHasRemarkInGradeSheet(conn, rowData, subjectCode, finalRemark, modifiedEventKey);
           
-  
           rows.changedRows 
           ? updatedData(rowData[6], 1)
           : noUpdateData(rowData[6], 1)
@@ -598,7 +727,6 @@ router.post(
             "INSERT INTO grade_logs (student_grades_id, status) VALUES(?, ?)",
             [rowData[0], "NP"]
           );
-    
           return rows.changedRows;
         } catch (err) {
           if (err) {
@@ -672,7 +800,6 @@ router.post(
       ]);
       await endConnection(conn);
       await fs.unlink(uploadFile.path);
-      // console.log({'hasUpdatedRow': hasUpdatedRow, 'notUpdatedRow': notUpdatedRow, 'noUpdateRow': noUpdateRow});
       res.status(200).json({isOkay: 1, isError: 0, updateDataContainer: updateDataContainer});
     } else {
       res.status(200).json({isOkay: 1, isError: 1, updateDataContainer: {}});
