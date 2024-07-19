@@ -24,7 +24,7 @@ const startConnection = async (req) => {
   } else {
     console.log('Referer not allowed. Using default DB config.');
   }
-
+  console.log(`DB Name: '${dbName}'`);
   try {
     const conn = await mysql.createPool({
       host: dbHost,

@@ -13,7 +13,14 @@ const {
   getAllNoAccounts,
   updateClassCodeStatus, 
   insertClassCodeUpdateLog,
-  getGradeTableService, 
+  getGradeTableService,
+  getColleges,
+  getProgramCodes,
+  getSubjectCodes,
+  checkNewCollege,
+  saveCollege,
+  getDeadlineLogs,
+  saveSubjectCode, 
 } = require("../services/admin.services");
 
 // response to Index Component
@@ -134,7 +141,7 @@ router.post('/updateClassCodeStatus', async (req, res) => {
 
 router.post('/updateClassStatus', async (req, res) => {
   const { action, email_used } = req.body;
-  let response = {};
+  let response;
   const conn = await startConnection(req);
   try {
     const [rows] = await conn.query(`SELECT * FROM registrar_activity_online`);
@@ -147,17 +154,20 @@ router.post('/updateClassStatus', async (req, res) => {
     } else {
       response = {"success": false, "message": "Successfully Updated", 'statusToAssign': 0, "updateStatus": "No changes"}
     }
+    res.status(200).json(response)
   } catch(err) {
     response = {"success": false ,"message": err.message}
+    res.status(500).json(response)
   } finally {
     await endConnection(conn);
   }
-  res.json(response)
+  console.log(response);
 })
 
 router.post('/updateSchedule', async (req, res) => {
     let {email_used, activity, schoolyear, semester, status, from, to} = req.body;
-    let response = {};
+    let response;
+    let statusCode;
     const conn = await startConnection(req);
     try {
         const [rows] = await conn.query(
@@ -169,25 +179,27 @@ router.post('/updateSchedule', async (req, res) => {
           );
           if(rows2.changedRows > 0) {
             const [deadlineLogs] = await conn.query("INSERT INTO deadline_log(email_used, activity, schoolyear, semester, status, `from`, `to`) VALUES(?, ?, ?, ?, ?, ?, ?)", [email_used, activity, schoolyear, semester, status, from, to]);
-            response = deadlineLogs.affectedRows > 0 ? {"success": true, "message": "Successfully Updated"} : {"success": false, "message": "Successfully Updated"}
+            console.log({deadlineLogs});
+            response =  {success: deadlineLogs.affectedRows > 0 ? true : false, message: "Successfully Updated"}
           } else {
-            response = {hasChanges: false, "message": "Successfully Update"}
+            response = {hasChanges: false, message: "Successfully Update"}
           }
         } else {
           await conn.query(
               'INSERT INTO registrar_activity_online VALUES(?, ?, ?, ?, ?, ?)',
               [activity, schoolyear, semester, status, from ,to]
           );
-          response = {"updated": false, "message": "Successfully Updated"}
+          response = {updated: false, message: "Successfully Updated"}
         } 
+        statusCode = 200;
     } catch(err) {
-        response = {"error": true, "message": err.message}
+        statusCode = 500;
+        response = {error: true, message: err.message}
         console.error(err.message);
     } finally {
       await endConnection(conn);
     }
-    console.log(response);
-    res.json(response)
+    res.status(statusCode).json(response)
 })
 
 router.post('/createUser', async (req, res) => {
@@ -359,4 +371,92 @@ router.post('/setDeadlineLogs', async (req, res) => {
   res.json(response)
 })
 
+
+// Settings Route
+
+// Get Colleges
+router.get('/getColleges', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getColleges(conn);
+    res.status(200).json(rows || [])
+  } catch(err) {
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+// Save College
+router.post('/saveCollege', async (req, res) => {
+  const { college_code, college_desc } = req.body;
+  const conn = await startConnection(req);
+  try { 
+    const checkIfExists = await checkNewCollege(conn, college_code, college_desc);
+    if(checkIfExists.length > 0) { 
+      res.status(200).json({message: "College already exist"})
+    } else {
+      const rows = await saveCollege(conn, college_code, college_desc);
+      res.status(200).json({message: "Successfully Saved", rows})
+    }
+  } catch(err) {
+    console.error(err.message);
+    res.status(500).json({message: "Unable to Save", error: err.message});
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+// Get Program Codes
+router.get('/getProgramCodes', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getProgramCodes(conn);
+    res.status(200).json(rows || [])
+  } catch(err) {
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+// Get Colleges
+router.get('/getSubjectCodes', async (req, res) => {
+  const { curriculum_id } = req.query;
+  const conn = await startConnection(req);
+  try {
+    const rows = await getSubjectCodes(conn, curriculum_id);
+    res.status(200).json(rows || [])
+  } catch(err) {
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.post('/saveSubjectCode', async (req, res) => {
+  const { subject_code } = req.body;
+  const conn = await startConnection(req);
+  try {
+    const rows = await saveSubjectCode(conn, subject_code);
+    res.status(200).json({message: "Successfully Saved", rows})
+  } catch(err) {
+    console.error(err.message);
+    res.status(500).json({message: "Unable to Save", error: err.message});
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.get('/getDeadlineLogs', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getDeadlineLogs(conn);
+    res.status(200).json(rows || [])
+  } catch(err) {
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
 module.exports = router;

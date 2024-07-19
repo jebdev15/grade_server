@@ -129,6 +129,61 @@ const insertClassCodeUpdateLog = async (conn, email_used, newStatus, classCodeDe
     const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code) VALUES(?, ?, ?)`, [email_used, newStatus ? 'Locked' : 'Unlocked', classCodeDecode ]);
     return logClassStatus
 }
+
+const getColleges = async (conn) => {
+    const [rows] = await conn.query(`SELECT * FROM college`)
+    return rows
+}
+
+const checkNewCollege = async (conn, college_code, college_desc) => {
+    const [rows] = await conn.query(`SELECT * FROM college WHERE college_code = ? AND college_desc = ?`, [college_code, , college_desc]);
+    return rows
+}
+const saveCollege = async (conn, college_code, college_desc) => {
+    const [rows] = await conn.query(`INSERT INTO college VALUES(?,?)`, [college_code, college_desc]);
+    return rows
+}
+
+const getProgramCodes = async (conn) => {
+    const [rows] = await conn.query(`SELECT 
+      curriculum_id, 
+      program_code 
+      FROM 
+        curriculum 
+      WHERE 
+        curriculum_title 
+      LIKE "%New Curriculum%" 
+      AND program_code NOT LIKE "BS%"
+      AND program_code NOT LIKE "BT%"
+      AND program_code NOT LIKE "AB%"
+      AND program_code NOT LIKE "BA%"
+      AND program_code NOT LIKE "BE%"
+      AND program_code NOT LIKE "BP%"
+      AND program_code NOT LIKE "TCP%"`)
+    return rows
+}
+
+const getSubjectCodes = async (conn, curriculum_id) => {
+    const [rows] = await conn.query(`SELECT 
+      DISTINCT subject_code 
+      FROM 
+      curriculum_subjects
+      WHERE 
+      curriculum_id = ?
+      AND subject_code NOT IN(SELECT subject_code FROM graduate_studies)
+      ORDER BY subject_code DESC`, [curriculum_id])
+    return rows
+}
+
+const saveSubjectCode = async (conn, subject_code) => {
+    const [rows] = await conn.query(`INSERT INTO graduate_studies(subject_code) VALUES(?)`, [subject_code]);
+    return rows
+}
+
+const getDeadlineLogs = async (conn) => {
+    const [rows] = await conn.query(`SELECT * FROM deadline_log ORDER BY id DESC`)
+    return rows
+}
 module.exports = {
     getCurrentSchedule,
     getEmails,
@@ -138,5 +193,12 @@ module.exports = {
     getGradeSubmissionLogs,
     getAllNoAccounts,
     updateClassCodeStatus,
-    insertClassCodeUpdateLog
+    insertClassCodeUpdateLog,
+    getColleges,
+    checkNewCollege,
+    saveCollege,
+    getProgramCodes,
+    getSubjectCodes,
+    getDeadlineLogs,
+    saveSubjectCode
 }
