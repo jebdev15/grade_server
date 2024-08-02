@@ -23,7 +23,9 @@ const {
   saveSubjectCode,
   getEmailsPerCollegeCode,
   getClassCodeDetails,
-  getClassStudents, 
+  getClassStudents,
+  getStudentsInitialData,
+  getStudentGrades, 
 } = require("../services/admin.services");
 const { getEmailsAllowedAccessLevels } = require("../utils/admin.utils");
 
@@ -500,4 +502,29 @@ router.get('/getClassStudents', async (req, res) => {
   }
 })
 
+router.get('/getStudentsInitialData', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getStudentsInitialData(conn, req);
+    res.json(rows || [])
+  } catch(err) {
+    res.json({message: err.message});
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.get('/getStudentGrades', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getStudentGrades(conn, req);
+    res.json(rows || [])
+  } catch(err) {
+    res.json({message: err.message});
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
 module.exports = router;

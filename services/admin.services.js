@@ -1,4 +1,5 @@
 const { urlDecode } = require("url-encode-base64");
+const { getStudentsAllowedAccessLevels } = require("../utils/admin.utils");
 
 const getCurrentSchedule = async (conn) => {
     const [rows] = await conn.query(`select * from registrar_activity`);
@@ -305,6 +306,73 @@ const getClassStudents = async (conn, req) => {
     const [rows] = await conn.query(query, [classCode]); 
     return rows
 }
+
+const getStudentsInitialData = async (conn, req) => {
+    const query = `
+      SELECT 
+        s.student_id AS id,
+        CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
+        CONCAT(curr.program_code, '-',cm.major_code) as programMajor,
+        latestStatus.status
+      FROM 
+        student s
+      INNER JOIN (
+        SELECT 
+          student_id,
+          status
+        FROM 
+          student_status
+        WHERE
+          student_status_id IN (
+            SELECT 
+              MAX(student_status_id) AS latest_status_id
+            FROM 
+              student_status
+            GROUP BY 
+              student_id
+          )
+      ) AS latestStatus ON s.student_id = latestStatus.student_id
+      LEFT JOIN 
+        curriculum_major cm
+      USING (curriculum_major_id)
+      LEFT JOIN
+        curriculum curr
+      USING (curriculum_id)
+      ORDER BY 
+        s.student_id
+      DESC;
+    `
+  const [rows] = await conn.query(query);
+  return rows
+}
+
+const getStudentGrades = async (conn, req) => {
+    const query = `
+      SELECT 
+        sg.student_grades_id,
+        sg.student_id,
+        CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
+        sg.subject_code,
+        sg.mid_grade,
+        sg.final_grade,
+        sg.grade,
+        sg.credit,
+        sg.remarks
+      FROM 
+        student_grades sg
+      INNER JOIN 
+        student s
+      USING (student_id)
+      WHERE 
+        sg.student_id = ?
+      ORDER BY 
+        sg.student_grades_id
+      DESC
+    `
+  const [rows] = await conn.query(query, [req.query.student_id]);
+  return rows
+}
+
 module.exports = {
     getCurrentSchedule,
     getEmails,
@@ -324,5 +392,7 @@ module.exports = {
     getDeadlineLogs,
     saveSubjectCode,
     getClassCodeDetails,
-    getClassStudents
+    getClassStudents,
+    getStudentsInitialData,
+    getStudentGrades
 }
