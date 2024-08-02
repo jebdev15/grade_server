@@ -16,7 +16,10 @@ const {
   getLoad,
   getGradeTable,
   getExcelFile,
-  getGraduateStudiesTable
+  getGraduateStudiesTable,
+  indexUpdateClassCodeStatus,
+  indexUpdateGrade,
+  indexUpdateGraduateStudiesGrade
 } = require("../services/index.services");
 
 router.get("/login", async (req, res) => {
@@ -24,10 +27,11 @@ router.get("/login", async (req, res) => {
   const { email } = req.query;
   let status;
   let response;
+  const accessLevels = ["Administrator","Registrar","Dean","Chairperson"];
   try {
-    const [rows] = await conn.query(`SELECT faculty_id, accessLevel FROM emails WHERE email = ? AND status = ?`,[email, 1]);
+    const [rows] = await conn.query(`SELECT faculty_id, accessLevel, college_code FROM emails WHERE email = ? AND status = ?`,[email, 1]);
     if(rows.length > 0) {
-      const url = (rows[0].accessLevel==="Administrator" || rows[0].accessLevel==="Registrar") ? "/admin" : "/home"
+      const url = (accessLevels.includes(rows[0].accessLevel)) ? "/admin" : "/home"
       rows.push({url})
       status = 200;
       response = rows;
@@ -529,14 +533,17 @@ router.get("/getExcelFile", async (req, res) => {
       formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, ROUND(AVERAGE(D${currentRow}:E${currentRow}), 0), "")`,
       result: average,
     };
+
     sheet.getCell(`G${currentRow}`).value = {
       formula: `IF(COUNTIF(D${currentRow}:E${currentRow}, "<>0") > 1, IF(ROUND(AVERAGE(D${currentRow}:E${currentRow}),0) >= 75, "Passed", "Failed"), "")`,
       result: status,
+      locked: true,
     };
     sheet.getCell(`H${currentRow}`).dataValidation = {
       type: "list",
       allowBlank: true,
       formulae: ['"Incomplete, Dropped, No Attendance, No Grade,  Withdrawn"'],
+      locked: true,
     };
   });
 
@@ -556,26 +563,8 @@ router.post("/updateGraduateStudiesGrade", async (req, res) => {
   const userName = await eventkeyUserEmailRef(conn, email_used);
   const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", ipAddress);
   const countAffectedRows = async (gradeData) => {
-    let { sg_id, mid_grade, end_grade, grade, dbRemark } = gradeData;
-    const identifyStatus = (grade >= 1 && grade <= 2) ? "Passed" : "Failed";
-    const status = identifyStatus.toLowerCase();
-    const remarks = (dbRemark.toLowerCase() !== "Passed" || dbRemark.toLowerCase() !== "Failed" || dbRemark.toLowerCase() !== "") ? dbRemark : status;
     try {
-      const [rows] = await conn.query(
-        "UPDATE student_grades,`subject` SET student_grades.mid_grade = ?, student_grades.final_grade = ?, student_grades.grade = ?, student_grades.remarks = ?, student_grades.credit = (`subject`.lec_units + `subject`.lab_units), student_grades.modified_eventkey = ? WHERE student_grades_id = ?",
-        [
-          mid_grade,
-          end_grade,
-          grade,
-          remarks,
-          modifiedEventKey,
-          sg_id,
-        ]
-      );
-      await conn.execute(
-        "INSERT INTO grade_logs (student_grades_id, status) VALUES(?, ?)",
-        [sg_id, "NP"]
-      );
+      const rows = await indexUpdateGraduateStudiesGrade(conn, gradeData, modifiedEventKey)
       return rows.affectedRows;
     } catch (err) {
       console.error(err.message);
@@ -596,11 +585,12 @@ router.post("/updateGraduateStudiesGrade", async (req, res) => {
       decodeClassCode,
       method,
     ]);
-    await endConnection(conn);
     res.status(200).json(totalAffectedRows);
   } catch (error) {
     if (error) console.log(error);
     res.status(500).json(error.message);
+  } finally {
+    await endConnection(conn);
   }
 });
 
@@ -613,37 +603,13 @@ router.post("/updateGrade", async (req, res) => {
   const userName = await eventkeyUserEmailRef(conn, email_used);
   const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", ipAddress);
   const countAffectedRows = async (grade) => {
-    let { sg_id, mid_grade, final_grade, dbRemark, status } = grade;
+    // let { sg_id, mid_grade, final_grade, dbRemark, status } = grade;
     
-    const average = Math.round((parseInt(mid_grade) + parseInt(final_grade)) / 2);
+    // const average = Math.round((parseInt(mid_grade) + parseInt(final_grade)) / 2);
     
     try {
-      const [rows] = await conn.query(
-        `UPDATE 
-          student_grades,
-          ${`subject`} 
-        SET 
-          student_grades.mid_grade = ?, 
-          student_grades.final_grade = ?, 
-          student_grades.remarks = ?, 
-          student_grades.grade = ?, 
-          student_grades.credit = (${`subject`}.lec_units + ${`subject`}.lab_units), 
-          student_grades.modified_eventkey = ? 
-        WHERE 
-          student_grades_id = ?`,
-        [
-          mid_grade=mid_grade === '' ? 0 : mid_grade,
-          final_grade=final_grade === '' ? 0 : final_grade,
-          dbRemark || status.toLowerCase(),
-          isNaN(average) ? 0 : average,
-          modifiedEventKey,
-          sg_id,
-        ]
-      );
-      await conn.execute(
-        "INSERT INTO grade_logs (student_grades_id, status) VALUES(?, ?)",
-        [sg_id, "NP"]
-      );
+      const rows = await indexUpdateGrade(conn, grade, modifiedEventKey);
+      
       return rows.affectedRows;
     } catch (err) {
       console.error(err.message);
@@ -806,5 +772,23 @@ router.post(
     }
   }
 );
+
+router.post('/submitGradeSheet', async (req, res) => {
+  const {class_code, status, email_used} = req.body;
+  const classCodeDecode = urlDecode(class_code);
+
+  let response = {};
+  const conn = await startConnection(req);
+  try {
+      response = await indexUpdateClassCodeStatus(conn, email_used, classCodeDecode);
+  } catch(err) {
+      response = {"success": false ,"message": "Failed to Update", "error": err.message}
+      console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+  console.log(response);
+  res.json(response)
+})
 
 module.exports = router;

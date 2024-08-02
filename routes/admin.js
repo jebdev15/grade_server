@@ -20,8 +20,12 @@ const {
   checkNewCollege,
   saveCollege,
   getDeadlineLogs,
-  saveSubjectCode, 
+  saveSubjectCode,
+  getEmailsPerCollegeCode,
+  getClassCodeDetails,
+  getClassStudents, 
 } = require("../services/admin.services");
+const { getEmailsAllowedAccessLevels } = require("../utils/admin.utils");
 
 // response to Index Component
 router.get('/getCurrentSchedule', async (req, res) => {
@@ -38,9 +42,12 @@ router.get('/getCurrentSchedule', async (req, res) => {
 
 // response to GradeSubmission Component
 router.get('/getEmails', async (req, res) => {
+    const { college_code, accessLevel } = req.query;
+    console.log({college_code, accessLevel});
+    const identifyAccessLevel = getEmailsAllowedAccessLevels(accessLevel);
     const conn = await startConnection(req);
     try {
-      const rows = await getEmails(conn);
+      const rows = identifyAccessLevel ? await getEmails(conn) : await getEmailsPerCollegeCode(conn, college_code);
       res.status(200).json(rows)
     } catch(err) {
       console.error(err.message);
@@ -203,18 +210,22 @@ router.post('/updateSchedule', async (req, res) => {
 })
 
 router.post('/createUser', async (req, res) => {
-  let { emailAddress, facultyId, accessLevel, emailUsed } = req.body;
+  let { emailAddress, college_code, facultyId, accessLevel, emailUsed } = req.body;
   let response = {};
+  const checkAccessLevelForCollegeCode = ['Dean', 'Chairperson'].includes(accessLevel);
   if(emailAddress.split('@')[1] === 'chmsu.edu.ph'){
     const conn = await startConnection(req);
-    if(['Administrator', 'Registrar'].includes(accessLevel)) {
+    if(['Administrator', 'Registrar', 'Dean', 'Chairperson'].includes(accessLevel)) {
       const [checkFacultyID] = await conn.query(`SELECT id FROM emails ORDER BY id DESC LIMIT 1`);
       facultyId = `${accessLevel}_${checkFacultyID[0].id+1}`
+    }
+    if(checkAccessLevelForCollegeCode) {
+      college_code='ALL'
     }
     try {
       const [rows] = await conn.query(`SELECT * FROM emails WHERE email = ?`, [emailAddress]);
       if(rows.length < 1) {
-        const [rows2] = await conn.query(`INSERT INTO emails(faculty_id, email, accessLevel) VALUES(?,?,?)`, [facultyId, emailAddress, accessLevel]);
+        const [rows2] = await conn.query(`INSERT INTO emails(faculty_id, email, college_code, accessLevel) VALUES(?,?,?,?)`, [facultyId, emailAddress, college_code, accessLevel]);
         await conn.query(`INSERT INTO email_logs(email_used, new_faculty_id, new_email, new_accessLevel, new_status, action_type) VALUES(?,?,?,?,?,?)`, [emailUsed, facultyId, emailAddress, accessLevel, 1, 'create']);
         response = rows2.affectedRows > 0 && {"success": 1, message:"Successfully Created"}
       } else {
@@ -234,16 +245,17 @@ router.post('/createUser', async (req, res) => {
 })
 
 router.post('/updateAccount', async (req, res) => {
-  const { id, email, faculty_id, accessLevel, status, emailUsed, dataToCheck } = req.body;
+  const { id, email, college_code, faculty_id, accessLevel, status, emailUsed, dataToCheck } = req.body;
   const data = JSON.parse(dataToCheck);
   const oldData = {
     email: data.email, 
+    college_code:data.college_code,
     faculty_id:data.faculty_id, 
     accessLevel:data.accessLevel, 
     status:data.status
   }
   const newData = {
-    email, faculty_id, accessLevel, status:parseInt(status)
+    email, college_code, faculty_id, accessLevel, status:parseInt(status)
   }
   const compareTwoObjects = (oldData, newData) => {
     const differences = [];
@@ -275,7 +287,7 @@ router.post('/updateAccount', async (req, res) => {
   }
   let newFacultyId;
   const conn = await startConnection(req);
-  if(['Administrator', 'Registrar'].includes(accessLevel)) {
+  if(['Administrator', 'Registrar', 'Dean', 'Chairperson'].includes(accessLevel)) {
     const [checkFacultyID] = await conn.query(`SELECT id FROM emails WHERE email = ? ORDER BY id DESC LIMIT 1`,[oldData.email]);
     newFacultyId = `${accessLevel}_${checkFacultyID[0].id}`
   } else {
@@ -300,12 +312,13 @@ router.post('/updateAccount', async (req, res) => {
     const rowUpdateEmailParam = [
       newFacultyId,
       newData.email,
+      newData.college_code,
       newData.accessLevel,
       newData.status,
       id
     ]
     try {
-      const [updateEmail] = await conn.query(`UPDATE emails SET faculty_id = ?, email = ?, accessLevel = ?, status = ? WHERE id = ?`, rowUpdateEmailParam);
+      const [updateEmail] = await conn.query(`UPDATE emails SET faculty_id = ?, email = ?, college_code = ?, accessLevel = ?, status = ? WHERE id = ?`, rowUpdateEmailParam);
       if(updateEmail.changedRows > 0) {
         const [emailLogs] = await conn.query(`INSERT INTO email_logs(email_used, old_faculty_id, new_faculty_id, old_email, new_email, old_accessLevel, new_accessLevel, old_status, new_status, action_type) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, rowEmailLogsParam);
         response = emailLogs.affectedRows > 0 ? {"success": true, message: "Successfully Updated"} : {"success": false, message: "Failed to Updated"}
@@ -325,7 +338,7 @@ router.post('/updateAccount', async (req, res) => {
 
 router.get('/getAccessLevels', async (req, res) => {
   const getAccessLevels = [
-    "Faculty", "Part Time", "Registrar", "Administrator"
+    "Faculty", "Part Time", "Registrar", "Administrator", "Chairperson", "Dean",
   ];
   res.json(getAccessLevels)
 })
@@ -381,7 +394,7 @@ router.get('/getColleges', async (req, res) => {
     const rows = await getColleges(conn);
     res.status(200).json(rows || [])
   } catch(err) {
-    console.error(err.message);
+    res.status(500).json([])
   } finally {
     await endConnection(conn);
   }
@@ -459,4 +472,32 @@ router.get('/getDeadlineLogs', async (req, res) => {
     await endConnection(conn);
   }
 })
+
+router.get('/getClassCodeDetails', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getClassCodeDetails(conn, req);
+    console.log(rows);
+    res.status(200).json(rows || [])
+  } catch(err) {
+    res.json({message: err.message});
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.get('/getClassStudents', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getClassStudents(conn, req);
+    res.status(200).json(rows || [])
+  } catch(err) {
+    res.json({message: err.message});
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
 module.exports = router;

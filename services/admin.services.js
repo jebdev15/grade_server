@@ -4,20 +4,43 @@ const getCurrentSchedule = async (conn) => {
     const [rows] = await conn.query(`select * from registrar_activity`);
     return rows.length > 0 ? rows : [];
 }
+
+
 const getEmails = async (conn) => {
-    const [rows] = await conn.query(
-        `select 
-        e.id,
-        f.lastname as lastName,
-        f.firstname as firstName,
-        e.email,
-        e.faculty_id,
-        e.status
-        from emails e
-        inner join faculty f
-        on e.faculty_id = f.faculty_id`
-    );
-    return rows.length > 0 ? rows : [];
+  const [rows] = await conn.query(
+      `select 
+      e.id,
+      f.lastname as lastName,
+      f.firstname as firstName,
+      e.email,
+      e.college_code,
+      e.faculty_id,
+      e.status
+      from emails e
+      inner join faculty f
+      using(faculty_id)`
+  );
+  return rows.length > 0 ? rows : [];
+}
+
+const getEmailsPerCollegeCode = async (conn, college_code) => {
+  const [rows] = await conn.query(
+      `select 
+      e.id,
+      f.lastname as lastName,
+      f.firstname as firstName,
+      e.email,
+      e.college_code,
+      e.faculty_id,
+      e.status
+      from emails e
+      inner join faculty f
+      on e.faculty_id = f.faculty_id
+      where e.college_code = ?
+      ORDER BY f.lastname DESC
+      `,[college_code]
+  );
+  return rows.length > 0 ? rows : [];
 }
 
 const getAllEmails = async (conn) => {
@@ -27,6 +50,7 @@ const getAllEmails = async (conn) => {
         f.lastname as lastName,
         f.firstname as firstName,
         e.email,
+        e.college_code,
         e.faculty_id,
         e.accessLevel,
         CASE WHEN e.status = 1 THEN 'Active' ELSE 'Deactivated' END as status
@@ -42,14 +66,32 @@ const getAllEmails = async (conn) => {
 
 const getSubjectLoad = async (conn, sqlParams, params) => {
     const [rows] = await conn.query(
-        `SELECT c.class_code as id, 
-              c.subject_code,
-              CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
-              COUNT(DISTINCT student_id) as noStudents,
-              c.status
-      FROM class c
-      INNER JOIN section s USING (section_id)
-      INNER JOIN student_load sl USING (class_code)
+        `SELECT 
+          c.class_code as id, 
+          c.subject_code,
+          CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
+          COUNT(DISTINCT student_id) as noStudents,
+          c.status,
+          (SELECT timestamp FROM updates u WHERE u.class_code = c.class_code ORDER BY id DESC LIMIT 1) as timestamp,
+          (SELECT method FROM updates u WHERE u.class_code = c.class_code ORDER BY u.id DESC LIMIT 1) as method,
+          (SELECT 
+              ul.timestamp 
+            FROM 
+              tbl_class_update_logs ul 
+            WHERE 
+              ul.class_code = c.class_code 
+            AND
+              ul.action_type = 'Submitted'
+            ORDER BY 
+              ul.timestamp DESC LIMIT 1) as submittedLog
+      FROM 
+        class c
+      INNER JOIN 
+        section s 
+      USING (section_id)
+      INNER JOIN 
+        student_load sl 
+      USING (class_code)
       WHERE c.faculty_id = ? AND c.school_year = ? AND c.semester = ?
        ${sqlParams} GROUP BY c.class_code ORDER BY section`,
        params
@@ -184,9 +226,89 @@ const getDeadlineLogs = async (conn) => {
     const [rows] = await conn.query(`SELECT * FROM deadline_log ORDER BY id DESC`)
     return rows
 }
+
+const getClassCodeDetails = async (conn, req) => {
+  const { class_code } = req.query;
+  const classCode = urlDecode(class_code);
+  const query = `
+    SELECT  
+      CONCAT(f.lastname,' ',f.firstname) as instructor,
+      CONCAT(c.subject_code, ' - ', sub.descriptive_title) as subject,
+      CONCAT(s.program_code,' ',s.yearlevel,' - ',s.section_code) as section,
+      (SELECT 
+        major.major_title
+      FROM 
+        student_grades
+      INNER JOIN 
+        section 
+      USING(program_code)
+      INNER JOIN 
+        major
+      USING(major_code)
+      LIMIT 1) AS major
+    FROM 
+      class c 
+    INNER JOIN 
+      faculty f 
+    USING (faculty_id)
+    INNER JOIN 
+      section s
+    USING (section_id)
+    INNER JOIN
+      subject sub
+    USING (subject_code)
+    WHERE 
+      c.class_code = ?`
+    const [rows] = await conn.query(query, [classCode]);
+    return rows
+}
+
+const getClassStudents = async (conn, req) => {
+  const { class_code } = req.query;
+  const classCode = urlDecode(class_code);
+  const query = `
+      SELECT 
+        sg.student_id as studentID,
+      CONCAT(s.student_lastname , ', ', s.student_firstname) as studentName, 
+      CASE 
+        WHEN sg.mid_grade = 0 THEN '' 
+        WHEN sg.mid_grade BETWEEN 1 AND 3 THEN FORMAT(sg.mid_grade,2)
+        ELSE FORMAT(sg.mid_grade,0) 
+      END as midTermGrade, 
+      CASE 
+        WHEN sg.final_grade = 0 THEN '' 
+        WHEN sg.final_grade BETWEEN 1 AND 3 THEN FORMAT(sg.final_grade,2)
+        ELSE FORMAT(sg.final_grade,0) 
+      END as endTermGrade, 
+      CASE 
+        WHEN sg.grade = 0 THEN '' 
+        ELSE FORMAT(sg.grade, 0) 
+      END as finalGrade, 
+      sg.remarks
+    FROM 
+      class c 
+    INNER JOIN 
+      student_load sl
+    USING (class_code) 
+    INNER JOIN 
+      student s 
+    USING (student_id)
+    INNER JOIN 
+      student_grades sg
+    USING (student_id)
+    WHERE 
+      class_code = ?
+    AND 
+      sg.subject_code = c.subject_code 
+    GROUP BY studentName
+    ORDER BY studentName`
+    const [rows] = await conn.query(query, [classCode]); 
+    return rows
+}
 module.exports = {
     getCurrentSchedule,
     getEmails,
+    getEmailsPerCollegeCode,
     getAllEmails,
     getSubjectLoad,
     getGradeTableService,
@@ -200,5 +322,7 @@ module.exports = {
     getProgramCodes,
     getSubjectCodes,
     getDeadlineLogs,
-    saveSubjectCode
+    saveSubjectCode,
+    getClassCodeDetails,
+    getClassStudents
 }
