@@ -25,7 +25,8 @@ const {
   getClassCodeDetails,
   getClassStudents,
   getStudentsInitialData,
-  getStudentGrades, 
+  getStudentGrades,
+  getStudentYearSemesterAndSchoolYear, 
 } = require("../services/admin.services");
 const { getEmailsAllowedAccessLevels } = require("../utils/admin.utils");
 
@@ -515,6 +516,19 @@ router.get('/getStudentsInitialData', async (req, res) => {
   }
 })
 
+router.get('/getStudentYearSemesterAndSchoolYear', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getStudentYearSemesterAndSchoolYear(conn, req);
+    res.json(rows || [])
+  } catch(err) {
+    res.json({message: err.message});
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
 router.get('/getStudentGrades', async (req, res) => {
   const conn = await startConnection(req);
   try {
@@ -527,4 +541,17 @@ router.get('/getStudentGrades', async (req, res) => {
     await endConnection(conn);
   }
 })
+
+router.get("/getSubjectCodesGS", async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const [rows] = await conn.query("SELECT * FROM graduate_studies");
+    res.status(200).json(rows);
+  } catch (err) {
+    console.log(err.message);
+    res.status(500).json(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+});
 module.exports = router;

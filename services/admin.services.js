@@ -54,7 +54,7 @@ const getAllEmails = async (conn) => {
         e.college_code,
         e.faculty_id,
         e.accessLevel,
-        CASE WHEN e.status = 1 THEN 'Active' ELSE 'Deactivated' END as status
+        CASE WHEN e.status = 1 THEN 'Active' ELSE 'Inactive' END as status
         from emails as e 
         LEFT JOIN faculty as f 
         USING(faculty_id) 
@@ -349,7 +349,7 @@ const getStudentsInitialData = async (conn, req) => {
 const getStudentGrades = async (conn, req) => {
     const query = `
       SELECT 
-        sg.student_grades_id,
+        sg.student_grades_id as id,
         sg.student_id,
         CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
         sg.subject_code,
@@ -364,13 +364,37 @@ const getStudentGrades = async (conn, req) => {
         student s
       USING (student_id)
       WHERE 
-        sg.student_id = ?
+        sg.student_id = ? AND
+        sg.year_level = ? AND
+        sg.semester = ? AND
+        sg.school_year = ?
       ORDER BY 
         sg.student_grades_id
       DESC
     `
-  const [rows] = await conn.query(query, [req.query.student_id]);
+  const [rows] = await conn.query(query, [req.query.student_id, req.query.year_level, req.query.semester, req.query.school_year]);
   return rows
+}
+
+
+const getStudentYearSemesterAndSchoolYear = async (conn, req) => {
+  const query = `
+    SELECT 
+      sg.student_grades_id,
+      sg.student_id,
+      sg.year_level,
+      sg.semester,
+      sg.school_year
+    FROM 
+      student_grades sg
+    WHERE 
+      sg.student_id = ?
+    GROUP BY 
+      sg.year_level
+    DESC
+  `
+const [rows] = await conn.query(query, [req.query.student_id]);
+return rows
 }
 
 module.exports = {
@@ -394,5 +418,6 @@ module.exports = {
     getClassCodeDetails,
     getClassStudents,
     getStudentsInitialData,
-    getStudentGrades
+    getStudentGrades,
+    getStudentYearSemesterAndSchoolYear
 }
