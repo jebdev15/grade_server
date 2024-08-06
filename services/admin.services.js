@@ -350,19 +350,18 @@ const getStudentGrades = async (conn, req) => {
     const query = `
       SELECT 
         sg.student_grades_id as id,
-        sg.student_id,
-        CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
         sg.subject_code,
-        sg.mid_grade,
-        sg.final_grade,
         sg.grade,
         sg.credit,
-        sg.remarks
+        sg.remarks,
+        mel.user as encoder
       FROM 
         student_grades sg
       INNER JOIN 
         student s
       USING (student_id)
+      INNER JOIN modified_eventlog mel
+      ON mel.modified_eventkey = sg.modified_eventkey
       WHERE 
         sg.student_id = ? AND
         sg.year_level = ? AND
@@ -380,23 +379,65 @@ const getStudentGrades = async (conn, req) => {
 const getStudentYearSemesterAndSchoolYear = async (conn, req) => {
   const query = `
     SELECT 
-      sg.student_grades_id,
-      sg.student_id,
-      sg.year_level,
+      DISTINCT sg.year_level,
       sg.semester,
-      sg.school_year
+      sg.school_year,
+      sg.student_id
     FROM 
       student_grades sg
     WHERE 
       sg.student_id = ?
     GROUP BY 
-      sg.year_level
+      sg.year_level, sg.semester, sg.school_year
     DESC
   `
 const [rows] = await conn.query(query, [req.query.student_id]);
 return rows
 }
 
+const getStudentsBySearch = async (conn, req) => {
+  const { searchParam } = req.body
+  const query = `
+    SELECT 
+        s.student_id AS id,
+        CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
+        CONCAT(curr.program_code, '-',cm.major_code) as programMajor,
+        latestStatus.status
+      FROM 
+        student s
+      INNER JOIN (
+        SELECT 
+          student_id,
+          status
+        FROM 
+          student_status
+        WHERE
+          student_status_id IN (
+            SELECT 
+              MAX(student_status_id) AS latest_status_id
+            FROM 
+              student_status
+            GROUP BY 
+              student_id
+          )
+      ) AS latestStatus ON s.student_id = latestStatus.student_id
+      LEFT JOIN 
+        curriculum_major cm
+      USING (curriculum_major_id)
+      LEFT JOIN
+        curriculum curr
+      USING (curriculum_id)
+      WHERE 
+        s.student_id LIKE ? OR
+        s.student_lastname LIKE ? OR
+        s.student_middlename LIKE ? OR
+        s.student_firstname LIKE ?
+      ORDER BY 
+        s.student_id
+      DESC;`
+  const [rows] = await conn.query(query, [`%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`]);
+  return rows.length > 0 ? rows : []
+}
 module.exports = {
     getCurrentSchedule,
     getEmails,
@@ -419,5 +460,6 @@ module.exports = {
     getClassStudents,
     getStudentsInitialData,
     getStudentGrades,
-    getStudentYearSemesterAndSchoolYear
+    getStudentYearSemesterAndSchoolYear,
+    getStudentsBySearch
 }
