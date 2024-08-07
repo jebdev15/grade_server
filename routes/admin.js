@@ -216,7 +216,7 @@ router.post('/updateSchedule', async (req, res) => {
 router.post('/createUser', async (req, res) => {
   let { emailAddress, college_code, facultyId, accessLevel, emailUsed } = req.body;
   let response = {};
-  const checkAccessLevelForCollegeCode = ['Dean', 'Chairperson'].includes(accessLevel);
+  const checkAccessLevelForCollegeCode = ['Administrator', 'Registrar'].includes(accessLevel);
   if(emailAddress.split('@')[1] === 'chmsu.edu.ph'){
     const conn = await startConnection(req);
     if(['Administrator', 'Registrar', 'Dean', 'Chairperson'].includes(accessLevel)) {

@@ -13,16 +13,14 @@ const startConnection = async (req) => {
   const refererURL = new URL(referer);
   const index = FRONT_URLS.indexOf(refererURL.origin)
   const refererOrigin = refererURL.origin;
-  const dbHost = index >= 0 ? DB_HOST[index] : DB_HOST[0];
-  const dbName = index >= 0 ? DB_NAME[index] : DB_NAME[0];
-  const dbUser = index >= 0 ? DB_USER[index] : DB_USER[0];
-  const dbPass = index >= 0 ? DB_PASSWORD[index] : DB_PASSWORD[0];
+  const dbHost = DB_HOST[index];
+  const dbName = DB_NAME[index];
+  const dbUser = DB_USER[index];
+  const dbPass = DB_PASSWORD[index];
   
   if (index >= 0) {
     console.log(`Referer: ${refererOrigin}`);
     console.log(`Using DB Config index: ${index}`);
-  } else {
-    console.log('Referer not allowed. Using default DB config.');
   }
   console.log(`DB Name: '${dbName}'`);
   try {

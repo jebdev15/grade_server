@@ -396,8 +396,11 @@ return rows
 }
 
 const getStudentsBySearch = async (conn, req) => {
-  const { searchParam } = req.body
-  const query = `
+  const { searchParam, accessLevel, college_code } = req.body
+  let query;
+  let queryParams;
+  if(accessLevel === 'Administrator' || accessLevel === 'Registrar') {
+    query = `
     SELECT 
         s.student_id AS id,
         CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
@@ -434,8 +437,57 @@ const getStudentsBySearch = async (conn, req) => {
         s.student_firstname LIKE ?
       ORDER BY 
         s.student_id
+      DESC;`;
+      queryParams = [`%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
+  } else if(accessLevel === 'Dean' || accessLevel === 'Chairperson') {
+    query = `
+    SELECT 
+        s.student_id AS id,
+        CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
+        CONCAT(curr.program_code, '-',cm.major_code) as programMajor,
+        p.college_code,
+        latestStatus.status
+      FROM 
+        student s
+      INNER JOIN (
+        SELECT 
+          student_id,
+          status
+        FROM 
+          student_status
+        WHERE
+          student_status_id IN (
+            SELECT 
+              MAX(student_status_id) AS latest_status_id
+            FROM 
+              student_status
+            GROUP BY 
+              student_id
+          )
+      ) AS latestStatus ON s.student_id = latestStatus.student_id
+      INNER JOIN 
+        curriculum_major cm
+      ON cm.curriculum_major_id = s.curriculum_major_id
+      INNER JOIN
+        curriculum curr
+      ON curr.curriculum_id = cm.curriculum_id
+      INNER JOIN
+        program p
+      ON p.program_code = curr.program_code
+      WHERE 
+        p.college_code = ? AND (
+          s.student_id LIKE ? OR
+          s.student_lastname LIKE ? OR
+          s.student_middlename LIKE ? OR
+          s.student_firstname LIKE ?
+        )
+      ORDER BY 
+        s.student_id
       DESC;`
-  const [rows] = await conn.query(query, [`%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`]);
+      queryParams = [college_code, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
+  }
+  console.log(accessLevel, college_code);
+  const [rows] = await conn.query(query, queryParams);
   return rows.length > 0 ? rows : []
 }
 module.exports = {
