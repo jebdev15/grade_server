@@ -54,6 +54,7 @@ const getAllEmails = async (conn) => {
         e.college_code,
         e.faculty_id,
         e.accessLevel,
+        e.program_code,
         CASE WHEN e.status = 1 THEN 'Active' ELSE 'Inactive' END as status
         from emails as e 
         LEFT JOIN faculty as f 
@@ -396,10 +397,11 @@ return rows
 }
 
 const getStudentsBySearch = async (conn, req) => {
-  const { searchParam, accessLevel, college_code } = req.body
+  const { searchParam, accessLevel, college_code, program_code } = req.body
   let query;
   let queryParams;
   if(accessLevel === 'Administrator' || accessLevel === 'Registrar') {
+    console.log({accessLevel: 'Administrator OR Registrar', college_code, program_code});
     query = `
     SELECT 
         s.student_id AS id,
@@ -439,7 +441,8 @@ const getStudentsBySearch = async (conn, req) => {
         s.student_id
       DESC;`;
       queryParams = [`%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
-  } else if(accessLevel === 'Dean' || accessLevel === 'Chairperson') {
+  } else if(accessLevel === 'Dean') {
+    console.log({accessLevel: 'Dean', college_code, program_code});
     query = `
     SELECT 
         s.student_id AS id,
@@ -485,11 +488,71 @@ const getStudentsBySearch = async (conn, req) => {
         s.student_id
       DESC;`
       queryParams = [college_code, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
+  } else if(accessLevel === 'Chairperson') {
+    console.log({accessLevel: 'Chairperson', college_code, program_code});
+    query = `
+    SELECT 
+        s.student_id AS id,
+        CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
+        CONCAT(curr.program_code, '-',cm.major_code) as programMajor,
+        p.college_code,
+        latestStatus.status
+      FROM 
+        student s
+      INNER JOIN (
+        SELECT 
+          student_id,
+          status
+        FROM 
+          student_status
+        WHERE
+          student_status_id IN (
+            SELECT 
+              MAX(student_status_id) AS latest_status_id
+            FROM 
+              student_status
+            GROUP BY 
+              student_id
+          )
+      ) AS latestStatus ON s.student_id = latestStatus.student_id
+      INNER JOIN 
+        curriculum_major cm
+      ON cm.curriculum_major_id = s.curriculum_major_id
+      INNER JOIN
+        curriculum curr
+      ON curr.curriculum_id = cm.curriculum_id
+      INNER JOIN
+        program p
+      ON p.program_code = curr.program_code
+      WHERE 
+        p.program_code = ? AND (
+          s.student_id LIKE ? OR
+          s.student_lastname LIKE ? OR
+          s.student_middlename LIKE ? OR
+          s.student_firstname LIKE ?
+        )
+      ORDER BY 
+        s.student_id
+      DESC;`
+      queryParams = [program_code, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
   }
-  console.log(accessLevel, college_code);
+  
   const [rows] = await conn.query(query, queryParams);
   return rows.length > 0 ? rows : []
 }
+
+const getProgramCodesByCampus = async (conn) => {
+  const [rows] = await conn.query(`SELECT 
+    curriculum_id, 
+    program_code 
+    FROM 
+      curriculum 
+    WHERE 
+      curriculum_title 
+    LIKE "%New Curriculum%"`)
+  return rows.length > 0 ? rows : []
+}
+
 module.exports = {
     getCurrentSchedule,
     getEmails,
@@ -513,5 +576,6 @@ module.exports = {
     getStudentsInitialData,
     getStudentGrades,
     getStudentYearSemesterAndSchoolYear,
-    getStudentsBySearch
+    getStudentsBySearch,
+    getProgramCodesByCampus
 }

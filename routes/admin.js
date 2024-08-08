@@ -1,10 +1,6 @@
 const express = require("express");
-const multer = require("multer");
-const fs = require("fs/promises");
-const upload = multer({ dest: "./tmp/" });
 const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
-const ExcelJS = require("exceljs");
 const { urlDecode } = require('url-encode-base64');
 const { 
   getEmails, 
@@ -27,7 +23,8 @@ const {
   getStudentsInitialData,
   getStudentGrades,
   getStudentYearSemesterAndSchoolYear,
-  getStudentsBySearch, 
+  getStudentsBySearch,
+  getProgramCodesByCampus, 
 } = require("../services/admin.services");
 const { getEmailsAllowedAccessLevels } = require("../utils/admin.utils");
 
@@ -214,9 +211,10 @@ router.post('/updateSchedule', async (req, res) => {
 })
 
 router.post('/createUser', async (req, res) => {
-  let { emailAddress, college_code, facultyId, accessLevel, emailUsed } = req.body;
+  let { emailAddress, college_code, program_code, facultyId, accessLevel, emailUsed } = req.body;
   let response = {};
   const checkAccessLevelForCollegeCode = ['Administrator', 'Registrar'].includes(accessLevel);
+  const checkAccessLevelForProgramCode = ['Administrator', 'Registrar', 'Dean'].includes(accessLevel);
   if(emailAddress.split('@')[1] === 'chmsu.edu.ph'){
     const conn = await startConnection(req);
     if(['Administrator', 'Registrar', 'Dean', 'Chairperson'].includes(accessLevel)) {
@@ -224,12 +222,15 @@ router.post('/createUser', async (req, res) => {
       facultyId = `${accessLevel}_${checkFacultyID[0].id+1}`
     }
     if(checkAccessLevelForCollegeCode) {
-      college_code='ALL'
+      college_code=''
+    }
+    if(checkAccessLevelForProgramCode) {
+      program_code=''
     }
     try {
       const [rows] = await conn.query(`SELECT * FROM emails WHERE email = ?`, [emailAddress]);
       if(rows.length < 1) {
-        const [rows2] = await conn.query(`INSERT INTO emails(faculty_id, email, college_code, accessLevel) VALUES(?,?,?,?)`, [facultyId, emailAddress, college_code, accessLevel]);
+        const [rows2] = await conn.query(`INSERT INTO emails(faculty_id, email, college_code, accessLevel, program_code) VALUES(?,?,?,?,?)`, [facultyId, emailAddress, college_code, accessLevel, program_code]);
         await conn.query(`INSERT INTO email_logs(email_used, new_faculty_id, new_email, new_accessLevel, new_status, action_type) VALUES(?,?,?,?,?,?)`, [emailUsed, facultyId, emailAddress, accessLevel, 1, 'create']);
         response = rows2.affectedRows > 0 && {"success": 1, message:"Successfully Created"}
       } else {
@@ -249,17 +250,18 @@ router.post('/createUser', async (req, res) => {
 })
 
 router.post('/updateAccount', async (req, res) => {
-  const { id, email, college_code, faculty_id, accessLevel, status, emailUsed, dataToCheck } = req.body;
+  const { id, email, college_code, faculty_id, accessLevel, status, emailUsed, dataToCheck, program_code } = req.body;
   const data = JSON.parse(dataToCheck);
   const oldData = {
     email: data.email, 
     college_code:data.college_code,
     faculty_id:data.faculty_id, 
     accessLevel:data.accessLevel, 
-    status:data.status
+    status:data.status,
+    program_code:data.program_code
   }
   const newData = {
-    email, college_code, faculty_id, accessLevel, status:parseInt(status)
+    email, college_code, faculty_id, accessLevel, status:parseInt(status), program_code
   }
   const compareTwoObjects = (oldData, newData) => {
     const differences = [];
@@ -319,10 +321,11 @@ router.post('/updateAccount', async (req, res) => {
       newData.college_code,
       newData.accessLevel,
       newData.status,
+      newData.program_code,
       id
     ]
     try {
-      const [updateEmail] = await conn.query(`UPDATE emails SET faculty_id = ?, email = ?, college_code = ?, accessLevel = ?, status = ? WHERE id = ?`, rowUpdateEmailParam);
+      const [updateEmail] = await conn.query(`UPDATE emails SET faculty_id = ?, email = ?, college_code = ?, accessLevel = ?, status = ?, program_code = ? WHERE id = ?`, rowUpdateEmailParam);
       if(updateEmail.changedRows > 0) {
         const [emailLogs] = await conn.query(`INSERT INTO email_logs(email_used, old_faculty_id, new_faculty_id, old_email, new_email, old_accessLevel, new_accessLevel, old_status, new_status, action_type) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, rowEmailLogsParam);
         response = emailLogs.affectedRows > 0 ? {"success": true, message: "Successfully Updated"} : {"success": false, message: "Failed to Updated"}
@@ -568,4 +571,17 @@ router.post("/getStudentsBySearch", async (req, res) => {
     await endConnection(conn);
   }
 });
+
+router.get("/getProgramCodesByCampus", async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await getProgramCodesByCampus(conn);
+    res.json(rows);
+  } catch (err) {
+    console.log(err.message);
+    res.json(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
 module.exports = router;

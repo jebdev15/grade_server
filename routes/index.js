@@ -29,7 +29,7 @@ router.get("/login", async (req, res) => {
   let response;
   const accessLevels = ["Administrator","Registrar","Dean","Chairperson"];
   try {
-    const [rows] = await conn.query(`SELECT faculty_id, accessLevel, college_code FROM emails WHERE email = ? AND status = ?`,[email, 1]);
+    const [rows] = await conn.query(`SELECT faculty_id, accessLevel, college_code, program_code FROM emails WHERE email = ? AND status = ?`,[email, 1]);
     if(rows.length > 0) {
       const url = (accessLevels.includes(rows[0].accessLevel)) ? "/admin" : "/home"
       rows.push({url})
