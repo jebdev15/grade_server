@@ -390,7 +390,6 @@ const getStudentYearSemesterAndSchoolYear = async (conn, req) => {
       sg.student_id = ?
     GROUP BY 
       sg.year_level, sg.semester, sg.school_year
-    DESC
   `
 const [rows] = await conn.query(query, [req.query.student_id]);
 return rows
