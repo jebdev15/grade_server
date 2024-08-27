@@ -1,14 +1,14 @@
 const mysql = require("mysql2/promise");
 require('dotenv').config();
-
+const {
+  DB_HOST,
+  DB_NAME,
+  DB_USER,
+  DB_PASSWORD,
+  FRONT_URLS
+} = require('../utils/envVariables');
 
 const startConnection = async (req) => {
-  const FRONT_URLS = JSON.parse(process.env.FRONT_URLS);
-  const DB_HOST = JSON.parse(process.env.DB_HOST);
-  const DB_NAME = JSON.parse(process.env.DB_NAME);
-  const DB_USER = JSON.parse(process.env.DB_USER);
-  const DB_PASSWORD = JSON.parse(process.env.DB_PASSWORD);
-  
   const referer = req.headers.referer || req.headers.referrer;
   const refererURL = new URL(referer);
   const index = FRONT_URLS.indexOf(refererURL.origin)
