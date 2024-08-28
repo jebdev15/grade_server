@@ -8,16 +8,11 @@ const AuthController = {
             const { status, response } = await AuthService.login(conn, req)
             res.status(status).json(response)
         } catch (error) {
-            res.json({message: error.message, email});
+            console.log({error});
+            res.json({message: error.message, email: req.body.email});
         } finally {
             await endConnection(conn);
         }
-        // try {
-        //     console.log("OK");
-        //     res.json({message:"OK"})
-        // } catch (error) {
-        //     console.error(error)
-        // }
     }
 }
 

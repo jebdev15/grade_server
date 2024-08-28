@@ -21,33 +21,7 @@ const {
   indexUpdateGrade,
   indexUpdateGraduateStudiesGrade
 } = require("../services/index.services");
-
-router.get("/login",  async (req, res) => {
-  const conn = await startConnection(req);
-  const { email } = req.query;
-  let status;
-  let response;
-  const accessLevels = ["Administrator","Registrar","Dean","Chairperson"];
-  try {
-    const [rows] = await conn.query(`SELECT faculty_id, accessLevel, college_code, program_code FROM emails WHERE email = ? AND status = ?`,[email, 1]);
-    if(rows.length > 0) {
-      const url = (accessLevels.includes(rows[0].accessLevel)) ? "/admin" : "/home"
-      rows.push({url})
-      status = 200;
-      response = rows;
-    } else {
-      status = 401;
-      response = {message: "Invalid Credentials", email};
-    }
-  } catch (error) {
-    console.log({error});
-    status = 500;
-    response = {message: error.message, email};
-  } finally {
-    await endConnection(conn);
-  }
-  res.status(status).json(response)
-});
+const verifyGoogleToken = require("../middlewares/verifyGoogleToken");
 
 router.get('/getClassGraduateStudiesStudents', async (req, res) => {
   const { class_code, semester, currentSchoolYear } = req.query;

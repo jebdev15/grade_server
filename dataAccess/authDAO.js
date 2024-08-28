@@ -6,15 +6,13 @@ const AuthDAO = {
     const [rows] = await conn.execute(query,[email, 1]);
     if (rows.length > 0) {
       return new AuthModel(
-        rows[0].faculty_id,
-        rows[0].accessLevel,
-        rows[0].college_code,
-        rows[0].program_code,
-        '/'
+        rows[0]?.faculty_id,
+        rows[0]?.accessLevel,
+        rows[0]?.college_code,
+        rows[0]?.program_code
       );
-    } else {
-      return null;
     }
+    return {};
   }
 }
 

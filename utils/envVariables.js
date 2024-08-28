@@ -6,6 +6,10 @@ const DB_USER = JSON.parse(process.env.DB_USER);
 const DB_PASSWORD = JSON.parse(process.env.DB_PASSWORD);
 const FRONT_URLS = JSON.parse(process.env.FRONT_URLS);
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? JSON.parse(process.env.ALLOWED_ORIGINS) : [];
+const {
+    GOOGLE_CLIENT_ID,
+    JWT_SECRET_KEY
+} = process.env;
 
 module.exports = {
     DB_HOST,
@@ -14,5 +18,6 @@ module.exports = {
     DB_PASSWORD,
     FRONT_URLS,
     ALLOWED_ORIGINS,
-    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID
+    GOOGLE_CLIENT_ID,
+    JWT_SECRET_KEY
 }
