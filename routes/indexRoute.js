@@ -184,7 +184,7 @@ router.get('/getCurrentSchoolYear', async (req, res) => {
   const conn = await startConnection(req);
   try {
     const [rows] = await conn.query("SELECT * FROM registrar_activity_online");
-    res.status(200).json(rows);
+    res.status(200).json(rows.length > 0 ? rows : []);
   } catch (err) {
     console.log(err.message);
     res.status(500).json(err.message);

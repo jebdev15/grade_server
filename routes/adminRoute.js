@@ -43,7 +43,7 @@ router.get('/getCurrentSchedule', async (req, res) => {
 
 // response to GradeSubmission Component
 router.get('/getEmails', async (req, res) => {
-    const { college_code, accessLevel } = req.query;
+    const { college_code, accessLevel } = req.cookies;
     console.log({college_code, accessLevel});
     const identifyAccessLevel = getEmailsAllowedAccessLevels(accessLevel);
     const conn = await startConnection(req);
@@ -148,7 +148,8 @@ router.post('/updateClassCodeStatus', async (req, res) => {
 })
 
 router.post('/updateClassStatus', async (req, res) => {
-  const { action, email_used } = req.body;
+  const { action } = req.body;
+  const email_used = req.cookies.email;
   let response;
   const conn = await startConnection(req);
   try {
@@ -344,10 +345,17 @@ router.post('/updateAccount', async (req, res) => {
 })
 
 router.get('/getAccessLevels', async (req, res) => {
+  const { accessLevel } = req.cookies;
   const getAccessLevels = [
     "Faculty", "Part Time", "Registrar", "Administrator", "Chairperson", "Dean",
   ];
-  res.json(getAccessLevels)
+  let data = [];
+  if(accessLevel !== 'Administrator') {
+    data = getAccessLevels.filter(user => user !== 'Administrator')
+  } else {
+    data = getAccessLevels
+  } 
+  res.json(data)
 })
 
 router.get('/getAllNoAccounts', async (req, res) => {

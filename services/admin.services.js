@@ -396,7 +396,8 @@ return rows
 }
 
 const getStudentsBySearch = async (conn, req) => {
-  const { searchParam, accessLevel, college_code, program_code } = req.body
+  const { searchParam } = req.body
+  const { accessLevel, college_code, program_code } = req.cookies
   let query;
   let queryParams;
   if(accessLevel === 'Administrator' || accessLevel === 'Registrar') {
