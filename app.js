@@ -2,8 +2,8 @@ const express = require("express");
 var debug = require("debug")("server");
 const app = express();
 const setupMiddleware = require("./config/middleware");
-setupMiddleware(app);
 const setupRoutes = require("./routes");
+setupMiddleware(app);
 setupRoutes(app);
 app.set("port", process.env.PORT || 3001);
 

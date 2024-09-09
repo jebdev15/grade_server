@@ -1,5 +1,5 @@
 const AuthService = require("../services/authService");
-const {startConnection, endConnection } = require("../config/conn")
+const { startConnection, endConnection } = require("../config/conn")
 
 const AuthController = {
     login: async (req, res) => {

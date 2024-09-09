@@ -173,42 +173,81 @@ router.post('/updateClassStatus', async (req, res) => {
   console.log(response);
 })
 
+// router.post('/updateSchedule', async (req, res) => {
+//     let {activity, schoolyear, semester, status, from, to} = req.body;
+//     const { email:email_used } = req.cookies;
+//     let response;
+//     let statusCode;
+//     const conn = await startConnection(req);
+//     try {
+//         const [rows] = await conn.query(
+//             `SELECT * FROM registrar_activity_online`
+//         );
+//         if(rows.length > 0){
+//           const [rows2] = await conn.query('UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
+//           [activity, schoolyear, semester, status, from ,to]
+//           );
+//           if(rows2.changedRows > 0) {
+//             const [deadlineLogs] = await conn.query("INSERT INTO deadline_log(email_used, activity, schoolyear, semester, status, `from`, `to`) VALUES(?, ?, ?, ?, ?, ?, ?)", [email_used, activity, schoolyear, semester, status, from, to]);
+//             console.log({deadlineLogs});
+//             response =  {success: deadlineLogs.affectedRows > 0 ? true : false, message: "Successfully Updated"}
+//           } else {
+//             response = {hasChanges: false, message: "Successfully Update"}
+//           }
+//         } else {
+//           await conn.query(
+//               'INSERT INTO registrar_activity_online VALUES(?, ?, ?, ?, ?, ?)',
+//               [activity, schoolyear, semester, status, from ,to]
+//           );
+//           response = {updated: false, message: "Successfully Updated"}
+//         } 
+//         statusCode = 200;
+//     } catch(err) {
+//         statusCode = 500;
+//         response = {error: true, message: err.message}
+//         console.error(err.message);
+//     } finally {
+//       await endConnection(conn);
+//     }
+//     res.status(statusCode).json(response)
+// })
 router.post('/updateSchedule', async (req, res) => {
-    let {email_used, activity, schoolyear, semester, status, from, to} = req.body;
-    let response;
-    let statusCode;
-    const conn = await startConnection(req);
-    try {
-        const [rows] = await conn.query(
-            `SELECT * FROM registrar_activity_online`
+  let {activity, schoolyear, semester, status, from, to} = req.body;
+  const { email:email_used } = req.cookies;
+  let response;
+  let statusCode;
+  const conn = await startConnection(req);
+  try {
+      const [rows] = await conn.query(
+          `SELECT * FROM registrar_activity_online`
+      );
+      if(rows.length > 0){
+        const [rows2] = await conn.query('UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
+        [activity, schoolyear, semester, status, from ,to]
         );
-        if(rows.length > 0){
-          const [rows2] = await conn.query('UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
-          [activity, schoolyear, semester, status, from ,to]
-          );
-          if(rows2.changedRows > 0) {
-            const [deadlineLogs] = await conn.query("INSERT INTO deadline_log(email_used, activity, schoolyear, semester, status, `from`, `to`) VALUES(?, ?, ?, ?, ?, ?, ?)", [email_used, activity, schoolyear, semester, status, from, to]);
-            console.log({deadlineLogs});
-            response =  {success: deadlineLogs.affectedRows > 0 ? true : false, message: "Successfully Updated"}
-          } else {
-            response = {hasChanges: false, message: "Successfully Update"}
-          }
+        if(rows2.changedRows > 0) {
+          const [deadlineLogs] = await conn.query("INSERT INTO deadline_log(email_used, activity, schoolyear, semester, status, `from`, `to`) VALUES(?, ?, ?, ?, ?, ?, ?)", [email_used, activity, schoolyear, semester, status, from, to]);
+          console.log({deadlineLogs});
+          response =  {success: deadlineLogs.affectedRows > 0 ? true : false, message: "Successfully Updated"}
         } else {
-          await conn.query(
-              'INSERT INTO registrar_activity_online VALUES(?, ?, ?, ?, ?, ?)',
-              [activity, schoolyear, semester, status, from ,to]
-          );
-          response = {updated: false, message: "Successfully Updated"}
-        } 
-        statusCode = 200;
-    } catch(err) {
-        statusCode = 500;
-        response = {error: true, message: err.message}
-        console.error(err.message);
-    } finally {
-      await endConnection(conn);
-    }
-    res.status(statusCode).json(response)
+          response = {hasChanges: false, message: "Successfully Update"}
+        }
+      } else {
+        await conn.query(
+            'INSERT INTO registrar_activity_online VALUES(?, ?, ?, ?, ?, ?)',
+            [activity, schoolyear, semester, status, from ,to]
+        );
+        response = {updated: false, message: "Successfully Updated"}
+      } 
+      statusCode = 200;
+  } catch(err) {
+      statusCode = 500;
+      response = {error: true, message: err.message}
+      console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+  res.status(statusCode).json(response)
 })
 
 router.post('/createUser', async (req, res) => {
@@ -571,6 +610,8 @@ router.post("/getStudentsBySearch", async (req, res) => {
   const conn = await startConnection(req);
   try {
     const rows = await getStudentsBySearch(conn, req);
+    console.log(rows);
+    
     res.json(rows);
   } catch (err) {
     console.log(err.message);

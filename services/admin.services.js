@@ -9,7 +9,7 @@ const getCurrentSchedule = async (conn) => {
 
 const getEmails = async (conn) => {
   const [rows] = await conn.query(
-      `select 
+      `select DISTINCT
       e.id,
       f.lastname as lastName,
       f.firstname as firstName,
@@ -401,9 +401,8 @@ const getStudentsBySearch = async (conn, req) => {
   let query;
   let queryParams;
   if(accessLevel === 'Administrator' || accessLevel === 'Registrar') {
-    console.log({accessLevel: 'Administrator OR Registrar', college_code, program_code});
     query = `
-    SELECT 
+    SELECT DISTINCT
         s.student_id AS id,
         CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
         CONCAT(curr.program_code, '-',cm.major_code) as programMajor,
@@ -442,9 +441,8 @@ const getStudentsBySearch = async (conn, req) => {
       DESC;`;
       queryParams = [`%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
   } else if(accessLevel === 'Dean') {
-    console.log({accessLevel: 'Dean', college_code, program_code});
     query = `
-    SELECT 
+    SELECT DISTINCT
         s.student_id AS id,
         CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
         CONCAT(curr.program_code, '-',cm.major_code) as programMajor,
@@ -489,9 +487,8 @@ const getStudentsBySearch = async (conn, req) => {
       DESC;`
       queryParams = [college_code, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
   } else if(accessLevel === 'Chairperson') {
-    console.log({accessLevel: 'Chairperson', college_code, program_code});
     query = `
-    SELECT 
+    SELECT DISTINCT
         s.student_id AS id,
         CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
         CONCAT(curr.program_code, '-',cm.major_code) as programMajor,
