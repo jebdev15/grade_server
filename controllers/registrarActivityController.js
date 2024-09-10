@@ -1,26 +1,28 @@
 const { startConnection, endConnection } = require("../config/conn");
 const { RegistrarActivityService } = require("../services/registrarActivityService");
 module.exports.RegistrarActivityController = {
-    getData: async (req, res) => {
-        const conn = await startConnection(req);
+    getData: async (conn) => {
         try {
             const rows = await RegistrarActivityService.getData(conn);
-            res.status(200).json(rows || [])
+            return rows
         } catch(err) {
             console.error(err.message);
-        } finally {
-            await endConnection(conn);
+        }
+    },
+    getOneData: async (conn, req) => {
+        try {
+            const rows = await RegistrarActivityService.getOneData(conn, req);
+            return rows
+        } catch(err) {
+            console.error(err.message);
         }
     },
     updateData: async (req, res) => {
         const conn = await startConnection(req);
         try {
             const rows = await updateRegistrarActivity(conn, req);
-            res.status(200).json(rows || [])
         } catch(err) {
             console.error(err.message);
-        } finally {
-            await endConnection(conn);
         }
     }
 }

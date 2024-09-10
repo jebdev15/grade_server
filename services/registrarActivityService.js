@@ -1,13 +1,10 @@
 module.exports.RegistrarActivityService = {
     getData: async (conn) => {
-        let {activity, schoolyear, semester, status, from, to} = req.body;
-        const { email:email_used } = req.cookies;
+        const [rows] = await conn.query(`SELECT * FROM registrar_activity_online`)
+        return rows;
     },
-    updateData: async (conn) => {
-        let { activity, schoolyear, semester, status, from, to } = req.body;
-        const { email:email_used } = req.cookies;
+    getOneData: async (conn, req) => {
+        const [rows] = await conn.query(`SELECT * FROM registrar_activity_online WHERE semester = ?`, [req.query.semester])
+        return rows;
     },
-    getRegistrarActivityOnline: async (conn) => {
-        const [rows] = await conn.query(`SELECT * FROM registrar_activity_online`)   
-    }
 }

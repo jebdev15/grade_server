@@ -27,6 +27,7 @@ const {
   getProgramCodesByCampus, 
 } = require("../services/admin.services");
 const { getEmailsAllowedAccessLevels } = require("../utils/admin.utils");
+const { RegistrarActivityController } = require("../controllers/registrarActivityController");
 
 // response to Index Component
 router.get('/getCurrentSchedule', async (req, res) => {
@@ -211,6 +212,31 @@ router.post('/updateClassStatus', async (req, res) => {
 //     }
 //     res.status(statusCode).json(response)
 // })
+
+router.get('/getRegistrarActivity', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await RegistrarActivityController.getData(conn);
+    res.status(200).json(rows || [])
+  } catch(err) {
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.get('/getOneRegistrarActivity', async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await RegistrarActivityController.getOneData(conn, req);
+    res.status(200).json(rows[0] || [])
+  } catch(err) {
+    console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
 router.post('/updateSchedule', async (req, res) => {
   let {activity, schoolyear, semester, status, from, to} = req.body;
   const { email:email_used } = req.cookies;
