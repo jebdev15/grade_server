@@ -1,28 +1,40 @@
 const { startConnection, endConnection } = require("../config/conn");
-const { RegistrarActivityService } = require("../services/registrarActivityService");
-module.exports.RegistrarActivityController = {
-    getData: async (conn) => {
-        try {
-            const rows = await RegistrarActivityService.getData(conn);
-            return rows
-        } catch(err) {
-            console.error(err.message);
-        }
-    },
-    getOneData: async (conn, req) => {
-        try {
-            const rows = await RegistrarActivityService.getOneData(conn, req);
-            return rows
-        } catch(err) {
-            console.error(err.message);
-        }
-    },
-    updateData: async (req, res) => {
+const RegistrarActivityService = require("../services/registrarActivityService");
+const RegistrarActivityController = {
+    getData: async (req, res) => {
         const conn = await startConnection(req);
         try {
-            const rows = await updateRegistrarActivity(conn, req);
+            const rows = await RegistrarActivityService.getData(conn);
+            res.status(200).json(rows || [])
         } catch(err) {
             console.error(err.message);
+            res.status(500).json({message: err});
+        } finally {
+            await endConnection(conn);
         }
-    }
+    },
+    getDataBySemester: async (req, res) => {
+        const conn = await startConnection(req);
+        try {
+          const rows = await RegistrarActivityService.getDataBySemester(conn, req);
+          res.status(200).json(rows[0] || [])
+        } catch(err) {
+          console.error(err.message);
+        } finally {
+          await endConnection(conn);
+        }
+      },
+    updateDataById: async (req, res) => {
+        const conn = await startConnection(req);
+        try {
+          const rows = await RegistrarActivityService.updateDataById(conn, req);
+          res.status(200).json(rows[0] || [])
+        } catch(err) {
+          console.error(err.message);
+        } finally {
+          await endConnection(conn);
+        }
+      }
 }
+
+module.exports = RegistrarActivityController
