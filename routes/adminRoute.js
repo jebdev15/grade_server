@@ -7,9 +7,6 @@ const {
   getSubjectLoad, 
   getAllEmails, 
   getAllNoAccounts,
-  updateClassCodeStatus, 
-  insertClassCodeUpdateLog,
-  getGradeTableService,
   getColleges,
   getProgramCodes,
   getSubjectCodes,
@@ -28,6 +25,9 @@ const {
 } = require("../services/admin.services");
 const { getEmailsAllowedAccessLevels } = require("../utils/admin.utils");
 const RegistrarActivityController = require("../controllers/registrarActivityController");
+const SubjectLoadController = require("../controllers/subjectLoadController");
+const FacultyController = require("../controllers/facultyController");
+const StudentController = require("../controllers/studentController");
 
 // response to Index Component
 router.get('/getCurrentSchedule', async (req, res) => {
@@ -43,6 +43,7 @@ router.get('/getCurrentSchedule', async (req, res) => {
 })
 
 // response to GradeSubmission Component
+router.get('/getFacultyBySchoolYearAndSemester', FacultyController.getFacultyBySchoolYearAndSemester)
 router.get('/getEmails', async (req, res) => {
     const { college_code, accessLevel } = req.cookies;
     console.log({college_code, accessLevel});
@@ -75,23 +76,7 @@ router.get("/getSubjectLoad", async (req, res) => {
     }
 });
 
-router.get("/getGradeTable", async (req, res) => {
-  const { class_code } = req.query;
-  const decode = {
-    classCode: urlDecode(class_code),
-  };
-  const conn = await startConnection(req);
-  try {
-    const rows = await getGradeTableService(conn, decode);
-    console.log(rows.length);
-    res.status(200).json(rows);
-  } catch (err) {
-    console.log(err.message);
-    res.status(500).json(err.message);
-  } finally {
-    await endConnection(conn);
-  }
-});
+router.get("/getStudentsByClassCode", StudentController.getStudentsByClassCode);
 
 // response to Users Component
 router.get('/getAllEmails', async (req, res) => {
@@ -122,141 +107,14 @@ router.get('/getGradeSubmissionLogs', async (req, res) => {
     }
 })
 
-router.post('/updateClassCodeStatus', async (req, res) => {
-    const {class_code, status, email_used} = req.body;
-    const classCodeDecode = urlDecode(class_code);
-    const newStatus = status == '1' ? 0 : 1;
-
-    let response = {};
-    const conn = await startConnection(req);
-    try {
-        const rows = await updateClassCodeStatus(conn, newStatus, classCodeDecode);
-        console.log(rows);
-        if(rows.changedRows > 0) {
-          const logClassStatus = await insertClassCodeUpdateLog(conn, email_used, newStatus, classCodeDecode);
-          response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status"} : {"success": false ,"message": "Failed to Update"}
-        } else {
-          response = {"success": false ,"message": "Status Updated"}
-        }
-    } catch(err) {
-        response = {"success": false ,"message": "Failed to Update", "error": err.message}
-        console.error(err.message);
-    } finally {
-      await endConnection(conn);
-    }
-    console.log(response);
-    res.json(response)
-})
-
-router.post('/updateClassStatus', async (req, res) => {
-  const { action } = req.body;
-  const email_used = req.cookies.email;
-  let response;
-  const conn = await startConnection(req);
-  try {
-    const [rows] = await conn.query(`SELECT * FROM registrar_activity_online`);
-    const [statusUpdate] = await conn.query('UPDATE class SET status=? WHERE school_year=? AND semester=?',[action === 'Lock' ? 1 : 0, rows[0].schoolyear, rows[0].semester]);
-    if(statusUpdate.changedRows > 0) {
-      const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code) VALUES(?, ?, ?)`, [email_used, action === 'Lock' ? 'Locked' : 'Unlocked', 'all']);
-      response = logClassStatus.affectedRows > 0 
-                  ? {"success": true, "message": "Successfully Updated", 'statusToAssign': 0} 
-                  : {"success": false, "message": "Successfully Updated", 'statusToAssign': 0, "logClassStatus": false}
-    } else {
-      response = {"success": false, "message": "Successfully Updated", 'statusToAssign': 0, "updateStatus": "No changes"}
-    }
-    res.status(200).json(response)
-  } catch(err) {
-    response = {"success": false ,"message": err.message}
-    res.status(500).json(response)
-  } finally {
-    await endConnection(conn);
-  }
-  console.log(response);
-})
-
-// router.post('/updateSchedule', async (req, res) => {
-//     let {activity, schoolyear, semester, status, from, to} = req.body;
-//     const { email:email_used } = req.cookies;
-//     let response;
-//     let statusCode;
-//     const conn = await startConnection(req);
-//     try {
-//         const [rows] = await conn.query(
-//             `SELECT * FROM registrar_activity_online`
-//         );
-//         if(rows.length > 0){
-//           const [rows2] = await conn.query('UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
-//           [activity, schoolyear, semester, status, from ,to]
-//           );
-//           if(rows2.changedRows > 0) {
-//             const [deadlineLogs] = await conn.query("INSERT INTO deadline_log(email_used, activity, schoolyear, semester, status, `from`, `to`) VALUES(?, ?, ?, ?, ?, ?, ?)", [email_used, activity, schoolyear, semester, status, from, to]);
-//             console.log({deadlineLogs});
-//             response =  {success: deadlineLogs.affectedRows > 0 ? true : false, message: "Successfully Updated"}
-//           } else {
-//             response = {hasChanges: false, message: "Successfully Update"}
-//           }
-//         } else {
-//           await conn.query(
-//               'INSERT INTO registrar_activity_online VALUES(?, ?, ?, ?, ?, ?)',
-//               [activity, schoolyear, semester, status, from ,to]
-//           );
-//           response = {updated: false, message: "Successfully Updated"}
-//         } 
-//         statusCode = 200;
-//     } catch(err) {
-//         statusCode = 500;
-//         response = {error: true, message: err.message}
-//         console.error(err.message);
-//     } finally {
-//       await endConnection(conn);
-//     }
-//     res.status(statusCode).json(response)
-// })
+router.patch('/updateClassStatusByClassCode', SubjectLoadController.updateClassStatusByClassCode);
+router.put('/updateClassStatusBySchoolYearAndSemester', SubjectLoadController.updateClassStatusByYearAndSemester);
 
 router.get('/getRegistrarActivity', RegistrarActivityController.getData)
-
 router.get('/getRegistrarActivityBySemester', RegistrarActivityController.getDataBySemester)
-
 router.put('/updateRegistrarActivityById', RegistrarActivityController.updateDataById)
 
-router.post('/updateSchedule', async (req, res) => {
-  let {activity, schoolyear, semester, status, from, to} = req.body;
-  const { email:email_used } = req.cookies;
-  let response;
-  let statusCode;
-  const conn = await startConnection(req);
-  try {
-      const [rows] = await conn.query(
-          `SELECT * FROM registrar_activity_online`
-      );
-      if(rows.length > 0){
-        const [rows2] = await conn.query('UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?',
-        [activity, schoolyear, semester, status, from ,to]
-        );
-        if(rows2.changedRows > 0) {
-          const [deadlineLogs] = await conn.query("INSERT INTO deadline_log(email_used, activity, schoolyear, semester, status, `from`, `to`) VALUES(?, ?, ?, ?, ?, ?, ?)", [email_used, activity, schoolyear, semester, status, from, to]);
-          console.log({deadlineLogs});
-          response =  {success: deadlineLogs.affectedRows > 0 ? true : false, message: "Successfully Updated"}
-        } else {
-          response = {hasChanges: false, message: "Successfully Update"}
-        }
-      } else {
-        await conn.query(
-            'INSERT INTO registrar_activity_online VALUES(?, ?, ?, ?, ?, ?)',
-            [activity, schoolyear, semester, status, from ,to]
-        );
-        response = {updated: false, message: "Successfully Updated"}
-      } 
-      statusCode = 200;
-  } catch(err) {
-      statusCode = 500;
-      response = {error: true, message: err.message}
-      console.error(err.message);
-  } finally {
-    await endConnection(conn);
-  }
-  res.status(statusCode).json(response)
-})
+router.put('/updateClassStatusByYearAndSemester', SubjectLoadController.updateClassStatusByYearAndSemester)
 
 router.post('/createUser', async (req, res) => {
   let { emailAddress, college_code, program_code, facultyId, accessLevel, emailUsed } = req.body;

@@ -28,7 +28,7 @@ const RegistrarActivityController = {
         const conn = await startConnection(req);
         try {
           const rows = await RegistrarActivityService.updateDataById(conn, req);
-          res.status(200).json(rows[0] || [])
+          res.status(200).json({message: "Successfully Updated", hasChanges: Boolean(rows.changedRows)})
         } catch(err) {
           console.error(err.message);
         } finally {
