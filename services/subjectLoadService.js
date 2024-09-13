@@ -40,7 +40,7 @@ const SubjectLoadService = {
                       ? {"success": true, "message": "Successfully Updated", 'statusToAssign': 0} 
                       : {"success": false, "message": "Successfully Updated", 'statusToAssign': 0, "logClassStatus": false}
         } else {
-          response = {"success": false, "message": "Successfully Updated", 'statusToAssign': 0, "updateStatus": "No changes"}
+          response = {"success": false, "message": "Failed to Update. No Changes", 'statusToAssign': 0, "updateStatus": "No changes"}
         }
         res.status(200).json(response)
       } catch(err) {
