@@ -22,6 +22,7 @@ const {
   indexUpdateGraduateStudiesGrade
 } = require("../services/index.services");
 const verifyGoogleToken = require("../middlewares/verifyGoogleToken");
+const RegistrarActivityController = require("../controllers/registrarActivityController");
 
 router.get('/getClassGraduateStudiesStudents', async (req, res) => {
   const { class_code, semester, currentSchoolYear } = req.query;
@@ -180,18 +181,7 @@ router.get('/getClassCodeDetails', async (req, res) => {
       }
 })
 
-router.get('/getCurrentSchoolYear', async (req, res) => {
-  const conn = await startConnection(req);
-  try {
-    const [rows] = await conn.query("SELECT * FROM registrar_activity_online");
-    res.status(200).json(rows.length > 0 ? rows : []);
-  } catch (err) {
-    console.log(err.message);
-    res.status(500).json(err.message);
-  } finally {
-    await endConnection(conn);
-  }
-})
+router.get('/getRegistrarActivity', RegistrarActivityController.getData);
 
 router.get('/getLastGradeSheetSubmittedLog', async (req, res) => {
   const { class_code } = req.query;

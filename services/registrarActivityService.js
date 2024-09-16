@@ -1,6 +1,6 @@
 const RegistrarActivityService = {
     getData: async (conn) => {
-        const [rows] = await conn.query(`SELECT * FROM registrar_activity_online`)
+        const [rows] = await conn.query(`SELECT * FROM registrar_activity_online ORDER BY id`)
         return rows;
     },
     getDataBySemester: async (conn, req) => {
