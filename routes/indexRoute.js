@@ -122,10 +122,11 @@ router.get('/getClassStudents', async (req, res) => {
       GROUP BY studentName
       ORDER BY studentName`
     );
-    await endConnection(conn);
     res.status(200).json(rows);
   } catch (error) {
     res.status(500).json(error.message);
+  } finally {
+    await endConnection(conn);
   }
 });
 
@@ -182,6 +183,7 @@ router.get('/getClassCodeDetails', async (req, res) => {
 })
 
 router.get('/getRegistrarActivity', RegistrarActivityController.getData);
+router.get('/getRegistrarActivityBySemester', RegistrarActivityController.getDataByEncodedSemester);
 
 router.get('/getLastGradeSheetSubmittedLog', async (req, res) => {
   const { class_code } = req.query;

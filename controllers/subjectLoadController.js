@@ -1,6 +1,14 @@
 const SubjectLoadService = require("../services/subjectLoadService");
 
 const SubjectLoadController = {
+    getClassByFacultyIdYearAndSemester: async (req, res) => {
+        try {
+          const rows = await SubjectLoadService.getSubjectLoadByFacultyIdYearAndSemester(req);
+          res.json(rows);
+        } catch (err) {
+          res.status(500).json(err.message);
+        }
+    },
     updateClassStatusByClassCode: async (req, res) => {
         try {
             const response = await SubjectLoadService.updateClassStatusByClassCode(req, res);
@@ -18,7 +26,7 @@ const SubjectLoadController = {
           console.error(error);
           res.json({message: "Failed to Update", error: error.message});
         }
-    }
+    },
 }
 
 module.exports = SubjectLoadController

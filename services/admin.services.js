@@ -85,7 +85,12 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
             AND
               ul.action_type = 'Submitted'
             ORDER BY 
-              ul.timestamp DESC LIMIT 1) as submittedLog
+              ul.timestamp DESC LIMIT 1) as submittedLog,
+            CASE 
+              WHEN c.subject_code IN (SELECT subject_code FROM graduate_studies) 
+                THEN true
+                ELSE false
+            END as isGraduate
       FROM 
         class c
       INNER JOIN 
@@ -99,6 +104,7 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
        params
       );
       const data = rows.length > 0 ? rows : [];
+      console.log({rows, sqlParams, params});
       return data
 }
 

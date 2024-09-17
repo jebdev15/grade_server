@@ -1,9 +1,24 @@
 const { urlDecode } = require("url-encode-base64");
 const { startConnection, endConnection } = require("../config/conn");
-const { updateClassCodeStatus, insertClassCodeUpdateLog } = require("./admin.services");
+const { updateClassCodeStatus, insertClassCodeUpdateLog, getSubjectLoad } = require("./admin.services");
 
 const SubjectLoadService = {
-    updateClassStatusByClassCode: async (req, res) => {
+    getSubjectLoadByFacultyIdYearAndSemester: async (req) => {
+      const { faculty_id, school_year, semester, class_code } = req.query;
+      const decodedParams = Object.values(req.query).map((param) => urlDecode(param))
+      const params = class_code ? [decodedParams[0], decodedParams[1], decodedParams[2], decodedParams[3]] : [decodedParams[0], decodedParams[1], decodedParams[2]];
+      const sqlParams = class_code ? `AND class_code = ?` : "";
+      const conn = await startConnection(req);
+      try {
+        const rows = await getSubjectLoad(conn, sqlParams, params);
+        return rows
+      } catch (err) {
+        console.log(err.message);
+      } finally {
+        await endConnection(conn);
+      }
+    },
+    updateClassStatusByClassCode: async (req) => {
         const {class_code, status} = req.body;
         const { email: email_used } = req.cookies;
         const classCodeDecode = urlDecode(class_code);

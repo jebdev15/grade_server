@@ -1,3 +1,5 @@
+const { urlDecode } = require("url-encode-base64");
+
 const RegistrarActivityService = {
     getData: async (conn) => {
         const [rows] = await conn.query(`SELECT * FROM registrar_activity_online ORDER BY id`)
@@ -5,6 +7,10 @@ const RegistrarActivityService = {
     },
     getDataBySemester: async (conn, req) => {
         const [rows] = await conn.query(`SELECT * FROM registrar_activity_online WHERE semester = ?`, [req.query.semester])
+        return rows;
+    },
+    getDataByEncodedSemester: async (conn, req) => {
+        const [rows] = await conn.query(`SELECT * FROM registrar_activity_online WHERE semester = ?`, [urlDecode(req.query.semester)])
         return rows;
     },
     updateDataById: async (conn, req) => {

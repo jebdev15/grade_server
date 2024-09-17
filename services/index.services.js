@@ -24,8 +24,12 @@ const getLoad = async (conn, query, params) => {
                 AND
                   ul.action_type = 'Submitted'
                 ORDER BY 
-                  ul.timestamp DESC LIMIT 1) as submittedLog
-                
+                  ul.timestamp DESC LIMIT 1) as submittedLog,
+                CASE 
+                  WHEN c.subject_code IN (SELECT subject_code FROM graduate_studies) 
+                    THEN true
+                    ELSE false
+                END as isGraduateStudies
       FROM class c
       INNER JOIN section s USING (section_id)
       INNER JOIN student_load sl USING (class_code)

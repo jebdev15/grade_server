@@ -60,22 +60,7 @@ router.get('/getEmails', async (req, res) => {
     }
 })
 // response to Eye Icon under GradeSubmission Component
-router.get("/getSubjectLoad", async (req, res) => {
-    const { faculty_id, school_year, semester, class_code } = req.query;
-    const decodedParams = Object.values(req.query).map((param) => urlDecode(param))
-    const params = class_code ? [decodedParams[0], decodedParams[1], decodedParams[2], decodedParams[3]] : [decodedParams[0], decodedParams[1], decodedParams[2]];
-    const sqlParams = class_code ? `AND class_code = ?` : "";
-    const conn = await startConnection(req);
-    try {
-      const rows = await getSubjectLoad(conn, sqlParams, params);
-      res.status(200).json(rows);
-    } catch (err) {
-      console.log(err.message);
-      res.status(500).json(err.message);
-    } finally {
-      await endConnection(conn);
-    }
-});
+router.get("/getSubjectLoad", SubjectLoadController.getClassByFacultyIdYearAndSemester);
 
 router.get("/getStudentsByClassCode", StudentController.getStudentsByClassCode);
 
