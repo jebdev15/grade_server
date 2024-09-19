@@ -94,7 +94,7 @@ router.get('/getGradeSubmissionLogs', async (req, res) => {
 })
 
 router.patch('/updateClassStatusByClassCode', SubjectLoadController.updateClassStatusByClassCode);
-router.put('/updateClassStatusBySchoolYearAndSemester', SubjectLoadController.updateClassStatusByYearAndSemester);
+// router.put('/updateClassStatusBySchoolYearAndSemester', SubjectLoadController.updateClassStatusByYearAndSemester);
 
 router.get('/getRegistrarActivity', RegistrarActivityController.getData)
 router.get('/getRegistrarActivityBySemester', RegistrarActivityController.getDataBySemester)

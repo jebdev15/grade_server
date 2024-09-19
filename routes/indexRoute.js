@@ -754,7 +754,6 @@ router.post('/submitGradeSheet', async (req, res) => {
   } finally {
     await endConnection(conn);
   }
-  console.log(response);
   res.json(response)
 })
 

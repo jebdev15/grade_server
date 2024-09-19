@@ -42,7 +42,7 @@ const SubjectLoadService = {
           await endConnection(conn);
         }
     },
-    updateClassStatusByYearAndSemester: async (req, res) => {
+    updateClassStatusByYearAndSemester: async (req) => {
       const { action, schoolyear, semester } = req.body;
       const {email:email_used} = req.cookies;
       let response;
@@ -57,10 +57,9 @@ const SubjectLoadService = {
         } else {
           response = {"success": false, "message": "Failed to Update. No Changes", 'statusToAssign': 0, "updateStatus": "No changes"}
         }
-        res.status(200).json(response)
+        return response
       } catch(err) {
-        response = {"success": false ,"message": err.message}
-        res.status(500).json(response)
+        return {"success": false ,"message": err.message}
       } finally {
         await endConnection(conn);
       }

@@ -136,12 +136,13 @@ const getExcelFile = async (conn, decode) => {
 const indexUpdateClassCodeStatus = async (conn, email_used, decodedClassCode) => {
   const [rows] = await conn.query(`UPDATE class SET status = ? WHERE class_code = ?`,[1, decodedClassCode]);
   let response;
+  const logClassStatus = rows.changedRows > 0 && await indexInsertClassCodeUpdateLog(conn, email_used, decodedClassCode);
   if(rows.changedRows > 0) {
-    const logClassStatus = await indexInsertClassCodeUpdateLog(conn, email_used, decodedClassCode);
     response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status"} : {"success": false ,"message": "Failed to Update"}
   } else {
-    response = {"success": false ,"message": "Status Updated"}
+    response = {success: false, message: "Status Updated", isUpdated: rows.changedRows, isLogged: logClassStatus.affectedRows}
   }
+  
   return response;
 }
 
