@@ -45,7 +45,7 @@ const getGradeTable = async (conn, decode) => {
         `SELECT 
           sg.student_grades_id as sg_id, 
           s.student_id, 
-          CONCAT(s.student_lastname , ', ', s.student_firstname) as name, 
+          CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as name, 
           CASE 
             WHEN sg.mid_grade = 0 THEN '' 
             WHEN sg.mid_grade BETWEEN 1 AND 5 THEN FORMAT(sg.mid_grade,2) 
@@ -111,7 +111,7 @@ const getExcelFile = async (conn, decode) => {
           c.subject_code, 
           sg.student_grades_id, 
           s.student_id, 
-          CONCAT(s.student_lastname , ', ', s.student_firstname) as name, 
+          CONCAT(s.student_lastname , ', ', s.student_firstname,' ',s.student_middlename) as name, 
           sg.mid_grade, 
           sg.final_grade, 
           sg.remarks

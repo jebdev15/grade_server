@@ -1,11 +1,10 @@
 const AuthDAO = require("../dataAccess/authDAO");
 const AuthUtil = require("../utils/authUtil");
+const { NODE_ENV } = require("../utils/envVariables");
 
 const AuthService = {
     login: async (conn, req) => {
         const { email } = req.body
-        console.log(email);
-        
         const accessLevels = {
             admin: ["Administrator","Registrar","Dean","Chairperson"],
             faculty: ["Faculty", "Partime"]
@@ -18,14 +17,21 @@ const AuthService = {
                             : "/"
         if(Object.entries(rows).length > 0) {
             const token = AuthUtil.generateToken(rows)
+            const data = [];
+            Object.keys(rows).map(key => data.push({name:key, value: rows[key]}));
+            const finalData = [
+                ...data, 
+                {name: "token", value: token}, 
+                {name: "email", value: email}
+            ]
             return {
                 status: 200,
-                response: {message: "Success", rows, token, path}
+                response: {message: "Success", token, rows:finalData, path, email}
             }
         } else {
             return {
                 status: 401,
-                response: {message: "Invalid Credentials", rows: null, token: null, path: "/"},
+                response: {message: "Invalid Credentials"},
             }
         }
     } 

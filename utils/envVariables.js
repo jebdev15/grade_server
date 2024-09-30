@@ -8,7 +8,8 @@ const FRONT_URLS = JSON.parse(process.env.FRONT_URLS);
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS ? JSON.parse(process.env.ALLOWED_ORIGINS) : [];
 const {
     GOOGLE_CLIENT_ID,
-    JWT_SECRET_KEY
+    JWT_SECRET_KEY,
+    NODE_ENV
 } = process.env;
 
 module.exports = {
@@ -19,5 +20,6 @@ module.exports = {
     FRONT_URLS,
     ALLOWED_ORIGINS,
     GOOGLE_CLIENT_ID,
-    JWT_SECRET_KEY
+    JWT_SECRET_KEY,
+    NODE_ENV
 }

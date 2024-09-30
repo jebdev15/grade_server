@@ -166,7 +166,7 @@ const getGradeSubmissionLogs = async (conn, class_code) => {
 }
 
 const getAllNoAccounts = async (conn) => {
-    const [data] = await conn.query(`SELECT * FROM faculty WHERE faculty_id NOT IN(SELECT faculty_id FROM emails) AND faculty.status<>? ORDER BY faculty.lastname`,['deleted'])
+    const [data] = await conn.query(`SELECT * FROM faculty WHERE faculty_id NOT IN(SELECT faculty_id FROM emails) AND faculty.status<>? ORDER BY faculty.faculty_id`,['deleted'])
     return data.length > 0 ? data : [];
 }
 

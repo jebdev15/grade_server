@@ -21,7 +21,6 @@ const {
   indexUpdateGrade,
   indexUpdateGraduateStudiesGrade
 } = require("../services/index.services");
-const verifyGoogleToken = require("../middlewares/verifyGoogleToken");
 const RegistrarActivityController = require("../controllers/registrarActivityController");
 
 router.get('/getClassGraduateStudiesStudents', async (req, res) => {
@@ -37,7 +36,7 @@ router.get('/getClassGraduateStudiesStudents', async (req, res) => {
       `
       SELECT 
         sg.student_id as studentID,
-        CONCAT(s.student_lastname , ', ', s.student_firstname) as studentName,
+        CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as studentName,
         sg.mid_grade as midTermGrade, 
         sg.final_grade as endTermGrade,  
         sg.grade as finalGrade, 
@@ -84,7 +83,7 @@ router.get('/getClassStudents', async (req, res) => {
       `
       SELECT 
         sg.student_id as studentID,
-        CONCAT(s.student_lastname , ', ', s.student_firstname) as studentName, 
+        CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as studentName, 
         CASE 
           WHEN sg.mid_grade = 0 THEN '' 
           WHEN sg.mid_grade BETWEEN 1 AND 3 THEN FORMAT(sg.mid_grade,2)
