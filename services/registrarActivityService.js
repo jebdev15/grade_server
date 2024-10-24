@@ -14,8 +14,8 @@ const RegistrarActivityService = {
         return rows;
     },
     updateDataById: async (conn, req) => {
-        const { activity, schoolyear, semester, status, from, to, id, currentSem } = req.body
-        const [rows] = await conn.query("UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?, currentSem = ? WHERE id = ?", [activity, schoolyear, semester, status, from, to, currentSem, id])
+        const { activity, schoolyear, semester, status, from, to, currentSem, termType, id } = req.body
+        const [rows] = await conn.query("UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?, currentSem = ?, term_type = ? WHERE id = ?", [activity, schoolyear, semester, status, from, to, currentSem, termType, id])
         return rows;
     },
 }
