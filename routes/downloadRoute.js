@@ -358,6 +358,7 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
           'Program/Year Level/Section',
           'School Year',
           'Semester',
+          'Term Type',
           'Timestamp'
       ]
       sheet.getRow(9).font = {
@@ -372,6 +373,7 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
           { key: 'section', width: 15 },
           { key: 'school_year', width: 15 },
           { key: 'semester', width: 15 },
+          { key: 'term_type', width: 15 },
           { key: 'timestamp', width: 25, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
       ]
 
@@ -397,6 +399,7 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
             section,
             school_year,
             semester,
+            term_type,
             timestamp,
           } = item;
 
@@ -412,6 +415,7 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
             section,
             school_year: `${school_year}-${school_year + 1}`,
             semester,
+            term_type,
             timestamp: dateFormatter(timestamp)
           }
       })

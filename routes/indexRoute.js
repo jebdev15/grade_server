@@ -19,7 +19,8 @@ const {
   getGraduateStudiesTable,
   indexUpdateClassCodeStatus,
   indexUpdateGrade,
-  indexUpdateGraduateStudiesGrade
+  indexUpdateGraduateStudiesGrade,
+  indexInsertMidtermClassCodeUpdateLog
 } = require("../services/index.services");
 const RegistrarActivityController = require("../controllers/registrarActivityController");
 
@@ -747,6 +748,22 @@ router.post('/submitGradeSheet', async (req, res) => {
   const conn = await startConnection(req);
   try {
       response = await indexUpdateClassCodeStatus(conn, email_used, classCodeDecode);
+  } catch(err) {
+      response = {"success": false ,"message": "Failed to Update", "error": err.message}
+      console.error(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+  res.json(response)
+})
+
+router.post('/submitMidtermGradeSheet', async (req, res) => {
+  const {class_code, email_used} = req.body;
+  const classCodeDecode = urlDecode(class_code);
+  let response = {};
+  const conn = await startConnection(req);
+  try {
+      response = await indexInsertMidtermClassCodeUpdateLog(conn, email_used, classCodeDecode);
   } catch(err) {
       response = {"success": false ,"message": "Failed to Update", "error": err.message}
       console.error(err.message);

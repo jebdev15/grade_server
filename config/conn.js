@@ -18,11 +18,11 @@ const startConnection = async (req) => {
   const dbUser = DB_USER[index];
   const dbPass = DB_PASSWORD[index];
   
-  // if (index >= 0) {
-  //   console.log(`Referer: ${refererOrigin}`);
-  //   console.log(`Using DB Config index: ${index}`);
-  // }
-  // console.log(`DB Name: '${dbName}'`);
+  if (index >= 0) {
+    console.log(`Referer: ${refererOrigin}`);
+    // console.log(`Using DB Config index: ${index}`);
+    console.log(`DB Name: ${dbName}`);
+  }
   try {
     const conn = await mysql.createPool({
       host: dbHost,

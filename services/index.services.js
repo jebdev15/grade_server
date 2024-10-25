@@ -151,6 +151,11 @@ const indexInsertClassCodeUpdateLog = async (conn, email_used, decodedClassCode)
   return rows;
 }
 
+const indexInsertMidtermClassCodeUpdateLog = async (conn, email_used, decodedClassCode) => {
+  const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [ email_used, 'Submitted', decodedClassCode, 'midterm' ]);
+  return rows;
+}
+
 const indexUpdateGrade = async (conn, grade, modifiedEventKey) => {
   
   let { sg_id, mid_grade, final_grade, dbRemark, status } = grade;
@@ -241,6 +246,7 @@ module.exports = {
     getGraduateStudiesTable,
     getExcelFile,
     indexUpdateClassCodeStatus,
+    indexInsertMidtermClassCodeUpdateLog,
     indexUpdateGrade,
     indexUpdateGraduateStudiesGrade
 }
