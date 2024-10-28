@@ -23,17 +23,34 @@ const getLoad = async (conn, query, params) => {
                   ul.class_code = c.class_code 
                 AND
                   ul.action_type = 'Submitted'
+                AND
+                  ul.term_type = 'midterm'
+                ORDER BY 
+                  ul.timestamp DESC LIMIT 1) as midtermSubmittedLog,
+                (SELECT 
+                  ul.timestamp 
+                FROM 
+                  tbl_class_update_logs ul 
+                INNER JOIN 
+                  class 
+                USING (class_code) 
+                WHERE 
+                  ul.class_code = c.class_code 
+                AND
+                  ul.action_type = 'Submitted'
+                AND
+                  ul.term_type = 'finalterm'
                 ORDER BY 
                   ul.timestamp DESC LIMIT 1) as submittedLog,
                 CASE 
                   WHEN c.subject_code IN (SELECT subject_code FROM graduate_studies) 
                     THEN true
                     ELSE false
-                END as isGraduateStudies
+                END as isGraduateStudies,
+                (SELECT midterm_status FROM class_code_status as ccs WHERE ccs.class_code = c.class_code) as midterm_status
       FROM class c
       INNER JOIN section s USING (section_id)
       INNER JOIN student_load sl USING (class_code)
-   
       WHERE faculty_id = ? AND school_year = ? AND semester = ?
        ${query} GROUP BY c.class_code ORDER BY section`, params
       );
@@ -153,9 +170,41 @@ const indexInsertClassCodeUpdateLog = async (conn, email_used, decodedClassCode)
 
 const indexInsertMidtermClassCodeUpdateLog = async (conn, email_used, decodedClassCode) => {
   const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [ email_used, 'Submitted', decodedClassCode, 'midterm' ]);
+  
+  const checkClassCodeResponse = await indexCheckIfClassCodeExistsInClassCodeStatus(conn, decodedClassCode);
+  return {checkClassCodeResponse, rows};
+}
+
+const indexInsertIntoClassCodeStatus = async (conn, decodedClassCode) => {
+  const [rows] = await conn.query(`INSERT INTO class_code_status(class_code) VALUES(?)`, [decodedClassCode]);
+  console.log({insert: rows})
   return rows;
 }
 
+const indexUpdateExistingClassCodeInClassCodeStatus = async (conn, decodedClassCode) => {
+  const [rows] = await conn.query(`UPDATE class_code_status SET midterm_status = ? WHERE class_code = ?`,[1, decodedClassCode]);
+  console.log({update: rows})
+  return rows;
+}
+const indexCheckIfClassCodeExistsInClassCodeStatus = async (conn, decodedClassCode) => {
+  try {
+    const query = 'SELECT 1 FROM class_code_status WHERE class_code = ? LIMIT 1';
+    const result = await conn.query(query, [decodedClassCode]);
+
+    // `result` is an array, with the first element being the rows
+    const [rows] = result;
+    const classCodeExists = rows.length > 0;
+    if(classCodeExists) {
+      await indexUpdateExistingClassCodeInClassCodeStatus(conn, decodedClassCode);
+    } else {
+      await indexInsertIntoClassCodeStatus(conn, decodedClassCode);
+    }
+    return classCodeExists;
+  } catch (err) {
+    console.error("Error checking class code:", err);
+    return false; // Or handle error as needed
+  }
+}
 const indexUpdateGrade = async (conn, grade, modifiedEventKey) => {
   
   let { sg_id, mid_grade, final_grade, dbRemark, status } = grade;

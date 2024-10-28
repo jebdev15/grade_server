@@ -90,7 +90,15 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
               WHEN c.subject_code IN (SELECT subject_code FROM graduate_studies) 
                 THEN true
                 ELSE false
-            END as isGraduate
+            END as isGraduate,
+            (
+              SELECT
+                class_code
+              FROM
+                class_code_status ccs
+              WHERE
+                ccs.class_code = c.class_code
+            ) as midterm_status
       FROM 
         class c
       INNER JOIN 
