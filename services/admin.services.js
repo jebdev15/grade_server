@@ -93,7 +93,7 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
             END as isGraduate,
             (
               SELECT
-                class_code
+                midterm_status
               FROM
                 class_code_status ccs
               WHERE
@@ -183,9 +183,19 @@ const updateClassCodeStatus = async (conn, newStatus, classCodeDecode) => {
     return rows;
 }
 
-const insertClassCodeUpdateLog = async (conn, email_used, newStatus, classCodeDecode) => {
-    const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code) VALUES(?, ?, ?)`, [email_used, newStatus ? 'Locked' : 'Unlocked', classCodeDecode ]);
+const updateMidtermClassStatusByClassCode = async (conn, newStatus, classCodeDecode) => {
+  const [rows] = await conn.query(`UPDATE class_code_status SET midterm_status = ? WHERE class_code = ?`,[newStatus, classCodeDecode]);
+  return rows;
+}
+
+const insertMidtermClassCodeUpdateLog = async (conn, email_used, newStatus, classCodeDecode) => {
+    const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, newStatus ? 'Locked' : 'Unlocked', classCodeDecode, 'midterm' ]);
     return logClassStatus
+}
+
+const insertClassCodeUpdateLog = async (conn, email_used, newStatus, classCodeDecode) => {
+  const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, newStatus ? 'Locked' : 'Unlocked', classCodeDecode, 'finalterm' ]);
+  return logClassStatus
 }
 
 const getColleges = async (conn) => {
@@ -574,6 +584,8 @@ module.exports = {
     getGradeSubmissionLogs,
     getAllNoAccounts,
     updateClassCodeStatus,
+    updateMidtermClassStatusByClassCode,
+    insertMidtermClassCodeUpdateLog,
     insertClassCodeUpdateLog,
     getColleges,
     checkNewCollege,

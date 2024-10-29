@@ -1,6 +1,6 @@
 const { urlDecode } = require("url-encode-base64");
 const { startConnection, endConnection } = require("../config/conn");
-const { updateClassCodeStatus, insertClassCodeUpdateLog, getSubjectLoad } = require("./admin.services");
+const { updateClassCodeStatus, insertClassCodeUpdateLog, getSubjectLoad, updateMidtermClassStatusByClassCode, insertMidtermClassCodeUpdateLog } = require("./admin.services");
 
 const SubjectLoadService = {
     getSubjectLoadByFacultyIdYearAndSemester: async (req) => {
@@ -27,12 +27,12 @@ const SubjectLoadService = {
         try {
             let response = {};
             const rows = await updateClassCodeStatus(conn, newStatus, classCodeDecode);
-            console.log(rows);
             if(rows.changedRows > 0) {
               const logClassStatus = await insertClassCodeUpdateLog(conn, email_used, newStatus, classCodeDecode);
-              response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status", newStatus} : {"success": false ,"message": "Failed to Update", newStatus: status}
+              response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status", newStatus} : {"success": false ,"message": "Failed to Update Status", newStatus: status}
+              console.log(classCodeDecode);
             } else {
-              response = {"success": false ,"message": "Status Updated", newStatus: status}
+                response = {"success": false ,"message": "Status Updated", newStatus: status}
             }
             return response;
         } catch(err) {
@@ -41,6 +41,30 @@ const SubjectLoadService = {
         } finally {
           await endConnection(conn);
         }
+    },
+    updateMidtermClassStatusByClassCode: async (req) => {
+      const { class_code, status } = req.body;
+      const { email: email_used } = req.cookies;
+      const classCodeDecode = urlDecode(class_code);
+      const newStatus = status == '1' ? 0 : 1;
+      const conn = await startConnection(req);
+      try {
+          let response = {};
+          const rows = await updateMidtermClassStatusByClassCode(conn, newStatus, classCodeDecode);
+          console.log(rows);
+          if(rows.changedRows > 0) {
+            const logClassStatus = await insertMidtermClassCodeUpdateLog(conn, email_used, newStatus, classCodeDecode);
+            response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status", newStatus} : {"success": false ,"message": "Failed to Update", newStatus: status}
+          } else {
+            response = {"success": false ,"message": "Status Updated", newStatus: status}
+          }
+          return response;
+      } catch(err) {
+          console.error(err.message);
+          return {"success": false ,"message": "Failed to Update", "error": err.message, newStatus: status};
+      } finally {
+        await endConnection(conn);
+      }
     },
     updateClassStatusByYearAndSemester: async (req) => {
       const { action, schoolyear, semester } = req.body;

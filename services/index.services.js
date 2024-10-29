@@ -164,7 +164,7 @@ const indexUpdateClassCodeStatus = async (conn, email_used, decodedClassCode) =>
 }
 
 const indexInsertClassCodeUpdateLog = async (conn, email_used, decodedClassCode) => {
-  const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code) VALUES(?, ?, ?)`, [email_used, 'Submitted', decodedClassCode ]);
+  const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, 'Submitted', decodedClassCode, 'finalterm' ]);
   return rows;
 }
 
