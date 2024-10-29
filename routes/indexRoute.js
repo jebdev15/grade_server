@@ -564,7 +564,7 @@ router.post("/updateGraduateStudiesGrade", async (req, res) => {
 router.post("/updateGrade", async (req, res) => {
   const conn = await startConnection(req);
   const ipAddress = req.ip;
-  const { grades, class_code, method, email_used } = req.body;
+  const { grades, class_code, method, email_used, term_type } = req.body;
 
   // Get User Full Name using Email as Preference
   const userName = await eventkeyUserEmailRef(conn, email_used);
@@ -593,9 +593,10 @@ router.post("/updateGrade", async (req, res) => {
       (prev, current) => prev + current,
       0
     );
-    await conn.query("INSERT INTO updates (class_code, method) VALUES(?, ?)", [
+    await conn.query("INSERT INTO updates (class_code, method, term_type) VALUES(?, ?, ?)", [
       decodeClassCode,
       method,
+      term_type
     ]);
     await endConnection(conn);
     res.status(200).json(totalAffectedRows);
@@ -610,7 +611,7 @@ router.post(
   upload.single("uploadFile"),
   async (req, res) => {
     const uploadFile = req.file;
-    const { class_code, method, email_used } = req.body;
+    const { class_code, method, email_used, term_type } = req.body;
     const decodeClassCode = urlDecode(class_code);
   
     const workbook = new ExcelJS.Workbook();
@@ -727,9 +728,10 @@ router.post(
         // }
       });
   
-      await conn.query("INSERT INTO updates(class_code, method) VALUES(?, ?)", [
+      await conn.query("INSERT INTO updates(class_code, method, term_type) VALUES(?, ?, ?)", [
         decodeClassCode,
         method,
+        term_type
       ]);
       await endConnection(conn);
       await fs.unlink(uploadFile.path);
