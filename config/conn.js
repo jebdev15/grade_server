@@ -22,6 +22,7 @@ const startConnection = async (req) => {
     console.log(`Referer: ${refererOrigin}`);
     // console.log(`Using DB Config index: ${index}`);
     console.log(`DB Name: ${dbName}`);
+    console.log(`DB Host: ${dbHost}`);
   }
   try {
     const conn = await mysql.createPool({

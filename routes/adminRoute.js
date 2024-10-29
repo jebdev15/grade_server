@@ -276,6 +276,48 @@ router.get('/getClassStudents', async (req, res) => {
   }
 })
 
+router.get('/getClassGraduateStudiesStudents', async (req, res) => {
+  const { class_code } = req.query;
+  const decode = {
+    classCode: urlDecode(class_code),
+  }
+  const conn = await startConnection(req);
+  try {
+    const [rows] = await conn.query(
+      `
+      SELECT 
+        sg.student_id as studentID,
+        CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as studentName,
+        FORMAT(sg.mid_grade, 2) as midTermGrade, 
+        FORMAT(sg.final_grade, 2) as endTermGrade,  
+        FORMAT(sg.grade, 2) as finalGrade, 
+        sg.remarks
+      FROM 
+        class c 
+      INNER JOIN 
+        student_load sl
+      USING (class_code) 
+      INNER JOIN 
+        student s 
+      USING (student_id)
+      INNER JOIN 
+        student_grades sg
+      USING (student_id)
+      WHERE 
+        class_code = '${decode.classCode}'
+      AND 
+        sg.subject_code = c.subject_code 
+      GROUP BY studentName
+      ORDER BY studentName`
+    );
+    res.status(200).json(rows);
+  } catch (error) {
+    res.status(500).json(error.message);
+  } finally {
+    await endConnection(conn);
+  }
+});
+
 router.get('/getStudentsInitialData', async (req, res) => {
   const conn = await startConnection(req);
   try {

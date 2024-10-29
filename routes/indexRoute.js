@@ -38,9 +38,9 @@ router.get('/getClassGraduateStudiesStudents', async (req, res) => {
       SELECT 
         sg.student_id as studentID,
         CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as studentName,
-        sg.mid_grade as midTermGrade, 
-        sg.final_grade as endTermGrade,  
-        sg.grade as finalGrade, 
+        FORMAT(sg.mid_grade,2) as midTermGrade, 
+        FORMAT(sg.final_grade,2) as endTermGrade,  
+        FORMAT(sg.grade,2) as finalGrade, 
         sg.remarks
       FROM 
         class c 
