@@ -10,8 +10,10 @@ const getLoad = async (conn, query, params) => {
               c.subject_code,
               CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
               COUNT(DISTINCT student_id) as noStudents,
-               (SELECT timestamp FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code ORDER BY id DESC LIMIT 1) as timestamp,
-               (SELECT method FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code ORDER BY id DESC LIMIT 1) as method,
+               (SELECT timestamp FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code AND term_type = 'midterm' ORDER BY id DESC LIMIT 1) as midterm_timestamp,
+               (SELECT timestamp FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code AND term_type = 'finalterm' ORDER BY id DESC LIMIT 1) as endterm_timestamp,
+               (SELECT method FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code AND term_type = 'midterm' ORDER BY id DESC LIMIT 1) as midterm_method,
+               (SELECT method FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code AND term_type = 'finalterm' ORDER BY id DESC LIMIT 1) as endterm_method,
                (SELECT 
                   ul.timestamp 
                 FROM 
@@ -26,7 +28,7 @@ const getLoad = async (conn, query, params) => {
                 AND
                   ul.term_type = 'midterm'
                 ORDER BY 
-                  ul.timestamp DESC LIMIT 1) as midtermSubmittedLog,
+                  ul.timestamp DESC LIMIT 1) as midterm_submittedLog,
                 (SELECT 
                   ul.timestamp 
                 FROM 
@@ -41,7 +43,7 @@ const getLoad = async (conn, query, params) => {
                 AND
                   ul.term_type = 'finalterm'
                 ORDER BY 
-                  ul.timestamp DESC LIMIT 1) as submittedLog,
+                  ul.timestamp DESC LIMIT 1) as endterm_submittedLog,
                 CASE 
                   WHEN c.subject_code IN (SELECT subject_code FROM graduate_studies) 
                     THEN true

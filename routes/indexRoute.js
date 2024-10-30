@@ -525,7 +525,7 @@ router.get("/getExcelFile", async (req, res) => {
 router.post("/updateGraduateStudiesGrade", async (req, res) => {
   const conn = await startConnection(req);
   const ipAddress = req.ip;
-  const { grades, class_code, method, email_used } = req.body;
+  const { grades, class_code, method, email_used, term_type } = req.body;
   // Get User Full Name using Email as Preference
   const userName = await eventkeyUserEmailRef(conn, email_used);
   const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", ipAddress);
@@ -548,9 +548,10 @@ router.post("/updateGraduateStudiesGrade", async (req, res) => {
       (prev, current) => prev + current,
       0
     );
-    await conn.query("INSERT INTO updates (class_code, method) VALUES(?, ?)", [
+    await conn.query("INSERT INTO updates (class_code, method, term_type) VALUES(?, ?, ?)", [
       decodeClassCode,
       method,
+      term_type
     ]);
     res.status(200).json(totalAffectedRows);
   } catch (error) {
