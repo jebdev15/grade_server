@@ -97,7 +97,7 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
               FROM
                 class_code_status ccs
               WHERE
-                ccs.class_code = c.class_code
+                ccs.class_code = c.class_code LIMIT 1
             ) as midterm_status
       FROM 
         class c

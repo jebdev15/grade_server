@@ -49,7 +49,7 @@ const getLoad = async (conn, query, params) => {
                     THEN true
                     ELSE false
                 END as isGraduateStudies,
-                (SELECT midterm_status FROM class_code_status as ccs WHERE ccs.class_code = c.class_code) as midterm_status
+                (SELECT midterm_status FROM class_code_status as ccs WHERE ccs.class_code = c.class_code LIMIT 1) as midterm_status
       FROM class c
       INNER JOIN section s USING (section_id)
       INNER JOIN student_load sl USING (class_code)
