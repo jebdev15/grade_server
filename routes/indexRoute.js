@@ -577,10 +577,9 @@ router.post("/updateGrade", async (req, res) => {
     
     try {
       const rows = await indexUpdateGrade(conn, grade, modifiedEventKey);
-      
       return rows.affectedRows;
     } catch (err) {
-      console.error(err.message);
+      console.error({error: err.message});
     }
   };
 
@@ -738,7 +737,7 @@ router.post(
       await fs.unlink(uploadFile.path);
       res.status(200).json({isOkay: 1, isError: 0, updateDataContainer: updateDataContainer});
     } else {
-      res.status(200).json({isOkay: 1, isError: 1, updateDataContainer: {}});
+      res.json({isOkay: 1, isError: 1, updateDataContainer: {}});
     }
   }
 );
