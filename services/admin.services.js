@@ -227,7 +227,8 @@ const getProgramCodes = async (conn) => {
       AND program_code NOT LIKE "BA%"
       AND program_code NOT LIKE "BE%"
       AND program_code NOT LIKE "BP%"
-      AND program_code NOT LIKE "TCP%"`)
+      AND program_code NOT LIKE "TCP%"
+      AND program_code NOT LIKE "BIT%"`)
     return rows
 }
 
