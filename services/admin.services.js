@@ -261,6 +261,8 @@ const getClassCodeDetails = async (conn, req) => {
     SELECT  
       CONCAT(f.lastname,' ',f.firstname) as instructor,
       CONCAT(c.subject_code, ' - ', sub.descriptive_title) as subject,
+      c.school_year,
+      c.semester,
       CONCAT(s.program_code,' ',s.yearlevel,' - ',s.section_code) as section,
       (SELECT 
         major.major_title
