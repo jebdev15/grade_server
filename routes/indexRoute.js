@@ -9,7 +9,8 @@ const { urlDecode } = require('url-encode-base64')
 const {
   eventkeyUserEmailRef,
   insertModifiedEventLog,
-  checkIfHasRemarkInGradeSheet
+  checkIfHasRemarkInGradeSheet,
+  checkIfHasRemarkInGSGradeSheet
 } = require("../services/eventkey");
 const { getSingleSetOfData } = require("../utils/get-data.utils");
 const { 
@@ -20,7 +21,8 @@ const {
   indexUpdateClassCodeStatus,
   indexUpdateGrade,
   indexUpdateGraduateStudiesGrade,
-  indexInsertMidtermClassCodeUpdateLog
+  indexInsertMidtermClassCodeUpdateLog,
+  getGSExcelFile
 } = require("../services/index.services");
 const RegistrarActivityController = require("../controllers/registrarActivityController");
 
@@ -391,13 +393,6 @@ router.get("/getExcelFile", async (req, res) => {
     bold: true,
     size: 13,
   };
-
-  // const subjectCode = sheet.getCell("B9");
-  // subjectCode.value = data[0].subject_code;
-  // subjectCode.font = {
-  //   bold: true,
-  //   size: 13,
-  // };
   
   const instructor = sheet.getCell("A10");
   instructor.value = `INSTRUCTOR: ${name}`;
@@ -405,13 +400,6 @@ router.get("/getExcelFile", async (req, res) => {
     bold: true,
     size: 13,
   };
-
-  // const section = sheet.getCell("D10");
-  // section.value = 'Section:';
-  // section.font = {
-  //   bold: true,
-  //   size: 13,
-  // };
 
   const sectionCode = sheet.getCell("E10");
   sectionCode.value = `CURR/ YR/ SEC: ${decodeURI(classSection)}`;
@@ -522,6 +510,256 @@ router.get("/getExcelFile", async (req, res) => {
   workbook.xlsx.write(res).then(() => res.end());
 });
 
+router.get("/getGSExcelFile", async (req, res) => {
+  const { class_code, semester, currentSchoolYear, name, classSection } =
+    req.query;
+  const decode = {
+    classCode: urlDecode(class_code),
+    semester: urlDecode(semester),
+    currentSchoolYear: urlDecode(currentSchoolYear),
+  }
+  const conn = await startConnection(req);
+  const data = await getGSExcelFile(conn, decode)
+  await endConnection(conn);
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "CHMSU Grading System";
+  workbook.created = new Date();
+  workbook.calcProperties.fullCalcOnLoad = true;
+  const sheet = workbook.addWorksheet(decode.classCode, {
+    pageSetup: {
+      fitToPage: true,
+      orientation: "portrait",
+      margins: {
+        left: 0.5,
+        right: 0.5,
+        top: 0.5,
+        bottom: 0.5,
+        header: 0,
+        footer: 0,
+      },
+    },
+  });
+  
+  //HEADER
+  sheet.mergeCells("A1", "H1");
+  const republic = sheet.getCell("A1");
+  republic.value = "Republic of the Philippines";
+  republic.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  sheet.mergeCells("A2", "H2");
+  const nameofSchool = sheet.getCell("A2");
+  nameofSchool.value = "CARLOS HILADO MEMORIAL STATE UNIVERSITY";
+  nameofSchool.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  nameofSchool.font = {
+    size: 12,
+    bold: true,
+  };
+
+  let semesterWord = "";
+  switch (decode.semester) {
+    case "1st":
+      semesterWord = "1st Semester";
+      break;
+    case "2nd":
+      semesterWord = "2nd Semester";
+      break;
+    case "summer":
+      semesterWord = "Summer";
+      break;
+    default:
+      break;
+  }
+  sheet.mergeCells("A3", "H3");
+  const campusInfo = sheet.getCell("A3");
+  campusInfo.value = "Main Campus, Talisay City, Negros Occidental";
+  campusInfo.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  const logoPic = workbook.addImage({
+    filename: `${__dirname}/../public/images/logo.png`,
+    extension: "png",
+  });
+  sheet.addImage(logoPic, {
+    tl: {
+      col: 1,
+      row: 1,
+    },
+    ext: {
+      width: 100,
+      height: 100,
+    },
+  });
+  sheet.mergeCells("A5", "H5");
+  const officeOfReg = sheet.getCell("A5");
+  officeOfReg.value = "Office of the Registrar";
+  officeOfReg.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  officeOfReg.font = {
+    size: 12,
+    bold: true,
+  };
+  sheet.mergeCells("A6", "H6");
+  const gradeSheetTitle = sheet.getCell("A6");
+  gradeSheetTitle.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  gradeSheetTitle.value = "Student Grade Sheet";
+  sheet.mergeCells("A7", "H7");
+  const classInfo = sheet.getCell("A7");
+  classInfo.value = `${semesterWord}, A.Y. ${decode.currentSchoolYear} - ${
+    parseInt(decode.currentSchoolYear) + 1
+  }`;
+  classInfo.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+
+  const subject = sheet.getCell("A9")
+  subject.value = `SUBJECT: ${data[0].subject_code}`;
+  subject.font = {
+    bold: true,
+    size: 13,
+  };
+  
+  const instructor = sheet.getCell("A10");
+  instructor.value = `INSTRUCTOR: ${name}`;
+  instructor.font = {
+    bold: true,
+    size: 13,
+  };
+
+  const sectionCode = sheet.getCell("E10");
+  sectionCode.value = `CURR/ YR/ SEC: ${decodeURI(classSection)}`;
+  sectionCode.font = {
+    bold: true,
+    size: 13,
+  };
+  sheet.getRow(11).values = [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "Note:",
+    "",
+  ];
+  sheet.getRow(12).values = [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "Please don't overwrite this column",
+    "",
+  ];
+  sheet.getRow(13).values = [
+    "Grade ID",
+    "Student ID",
+    "Name",
+    "Midterm",
+    "Endterm",
+    "Grade",
+    "Status",
+    "Remark",
+  ];
+  sheet.getRow(13).font = {
+    bold: true,
+  };
+  sheet.columns = [
+    { key: "student_grades_id", width: 10 },
+    { key: "student_id", width: 10 },
+    { key: "name", width: 50 },
+    { key: "mid_grade", width: 10 },
+    { key: "final_grade", width: 10 },
+    { key: "grade", width: 10 },
+    { key: "status", width: 35 },
+    { key: "remarks", width: 12 },
+  ];
+  data.forEach((item, i) => {
+    const {
+      student_grades_id,
+      student_id,
+      name,
+      mid_grade,
+      final_grade,
+      grade,
+      remarks,
+    } = item;
+    const currentRow = i + 14;
+    const row = sheet.getRow(currentRow);
+    row.font = {
+      size: 13,
+    };
+
+    let remark = null;
+    let status = null;
+    switch (remarks) {
+      case "passed":
+        status = "Passed";
+        break;
+      case "failed":
+        status = "Failed";
+        break;
+      case "inc":
+        remark = "Incomplete";
+        break;
+      case "drp":
+        remark = "Dropped";
+        break;
+      case "ng":
+        remark = "No Grade";
+        break;
+      case "na":
+        remark = "No Attendance";
+        break;
+      case "w":
+        remark = "Withdrawn";
+        break;
+      default:
+        break;
+    }
+    row.values = {
+      student_grades_id,
+      student_id,
+      name,
+      mid_grade,
+      final_grade,
+      grade,
+      status,
+      remarks: remark,
+    };
+    sheet.getCell(`F${currentRow}`).value = grade;
+    sheet.getCell(`G${currentRow}`).value = {
+      formula: `IF(AND(ISNUMBER(F${currentRow}), F${currentRow}<>""), IF(AND(MROUND(AVERAGE(F${currentRow}), 0.25) <= 2, MROUND(AVERAGE(F${currentRow}), 0.25) >= 1), "Passed", "Failed"), "")`,
+      result: status,
+      locked: true,
+    };
+    sheet.getCell(`H${currentRow}`).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"Incomplete, Dropped, No Attendance, No Grade,  Withdrawn"'],
+      locked: true,
+    };
+  });
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", "attachment; filename=" + "File.xlsx");
+  workbook.xlsx.write(res).then(() => res.end());
+});
+
 router.post("/updateGraduateStudiesGrade", async (req, res) => {
   const conn = await startConnection(req);
   const ipAddress = req.ip;
@@ -571,10 +809,6 @@ router.post("/updateGrade", async (req, res) => {
   const userName = await eventkeyUserEmailRef(conn, email_used);
   const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", ipAddress);
   const countAffectedRows = async (grade) => {
-    // let { sg_id, mid_grade, final_grade, dbRemark, status } = grade;
-    
-    // const average = Math.round((parseInt(mid_grade) + parseInt(final_grade)) / 2);
-    
     try {
       const rows = await indexUpdateGrade(conn, grade, modifiedEventKey);
       return rows.affectedRows;
@@ -698,34 +932,6 @@ router.post(
             res.status(500).send(error.message);
           }
         }
-        // if (rowNumber > 5) {
-        //   const rowData = extractRowData(row);
-        //   let finalRemark = "";
-        //   if (rowData[4]) finalRemark = rowData[4].toLowerCase();
-        //   else {
-        //     switch (rowData[5]) {
-        //       case "Incomplete":
-        //         finalRemark = "inc";
-        //         break;
-        //       case "Dropped":
-        //         finalRemark = "drp";
-        //         break;
-        //       case "No Attendance":
-        //         finalRemark = "na";
-        //         break;
-        //       case "Withdrawn":
-        //         finalRemark = "w";
-        //         break;
-        //       default:
-        //         break;
-        //     }
-        //   }
-        //   try {
-        //     await processRow(rowData, finalRemark);
-        //   } catch (error) {
-        //     res.status(500).send(error.message);
-        //   }
-        // }
       });
   
       await conn.query("INSERT INTO updates(class_code, method, term_type) VALUES(?, ?, ?)", [
@@ -733,6 +939,83 @@ router.post(
         method,
         term_type
       ]);
+      await endConnection(conn);
+      await fs.unlink(uploadFile.path);
+      res.status(200).json({isOkay: 1, isError: 0, updateDataContainer: updateDataContainer});
+    } else {
+      res.json({isOkay: 1, isError: 1, updateDataContainer: {}});
+    }
+  }
+);
+
+router.post(
+  "/uploadGSGradeSheet",
+  upload.single("uploadFile"),
+  async (req, res) => {
+    const uploadFile = req.file;
+    const { class_code, method, email_used, term_type } = req.body;
+    const decodeClassCode = urlDecode(class_code);
+  
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(uploadFile.path);
+
+    const sheet = workbook.worksheets[0];
+    const sheetName = sheet.name
+    const updateDataContainer = [];
+
+    let updatedData = (name, hasUpdated) => {
+        updateDataContainer.push({name, hasUpdated})
+    }
+
+    let noUpdateData = (name, noUpdate) => {
+      updateDataContainer.push({name, noUpdate})
+    }
+
+    if(sheetName === decodeClassCode) {
+      const extractRowData = (row) => {
+        return [
+          row.values[1],
+          row.values[4],
+          row.values[5],
+          row.values[6],
+          row.getCell(7).result,
+          row.values[8],
+          row.values[3],
+        ];
+      };
+      
+      const conn = await startConnection(req);
+      const userName = await eventkeyUserEmailRef(conn, email_used);
+      const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", req.ip);
+      const [rows] = await conn.query("SELECT subject_code FROM class WHERE class_code = ?",[decodeClassCode]);
+      const subjectCode = rows[0].subject_code;
+      const processRow = async (rowData) => {
+        try {
+          const rows = await checkIfHasRemarkInGSGradeSheet(conn, rowData, subjectCode, modifiedEventKey);
+          rows.changedRows 
+          ? updatedData(rowData[6], 1)
+          : noUpdateData(rowData[6], 1)
+          await conn.execute("INSERT INTO grade_logs (student_grades_id, status) VALUES(?, ?)",[rowData[0], "NP"]);
+          return rows.changedRows;
+        } catch (err) {
+          if (err) {
+            console.error(err.message);
+          }
+        }
+      }
+
+      sheet.eachRow({ includeEmpty: true }, async (row, rowNumber) => {
+        if (rowNumber > 13) {
+          const rowData = extractRowData(row);
+          try {
+            await processRow(rowData);
+          } catch (error) {
+            res.status(500).send(error.message);
+          }
+        }
+      });
+  
+      await conn.query("INSERT INTO updates(class_code, method, term_type) VALUES(?, ?, ?)", [decodeClassCode,method,term_type]);
       await endConnection(conn);
       await fs.unlink(uploadFile.path);
       res.status(200).json({isOkay: 1, isError: 0, updateDataContainer: updateDataContainer});

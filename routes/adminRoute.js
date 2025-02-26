@@ -109,9 +109,7 @@ router.put('/updateUser', UserController.updateUser)
 
 router.get('/getAccessLevels', async (req, res) => {
   const { accessLevel } = req.cookies;
-  const getAccessLevels = [
-    "Faculty", "Part Time", "Registrar", "Administrator", "Chairperson", "Dean",
-  ];
+  const getAccessLevels = ["Faculty", "Part Time", "Registrar", "Administrator", "Chairperson", "Dean"];
   let data = [];
   if(accessLevel !== 'Administrator') {
     data = getAccessLevels.filter(user => user !== 'Administrator')
@@ -307,8 +305,9 @@ router.get('/getClassGraduateStudiesStudents', async (req, res) => {
       USING (student_id)
       WHERE 
         class_code = '${decode.classCode}'
-      AND 
-        sg.subject_code = c.subject_code 
+        AND sg.subject_code = c.subject_code
+        AND sg.school_year = c.school_year
+        AND sg.semester = c.semester 
       GROUP BY studentName
       ORDER BY studentName`
     );
@@ -391,6 +390,64 @@ router.get("/getProgramCodesByCampus", async (req, res) => {
   const conn = await startConnection(req);
   try {
     const rows = await getProgramCodesByCampus(conn);
+    res.json(rows);
+  } catch (err) {
+    console.log(err.message);
+    res.json(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.get("/getAllEmailsForExtension", async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const { school_year, semester } = req.query
+      const [rows] = await conn.query(
+          `select 
+          e.id,
+          f.lastname as lastName,
+          f.firstname as firstName,
+          e.email,
+          e.college_code,
+          e.faculty_id,
+          e.accessLevel,
+          e.program_code,
+          GROUP_CONCAT(class_code SEPARATOR ', ') as class_codes,
+          GROUP_CONCAT(CONCAT(c.subject_code, ' - ',CONCAT(s.program_code,' ',s.yearlevel,' - ',s.section_code)) SEPARATOR ', ') as class_list,
+          CASE WHEN e.status = 1 THEN 'Active' ELSE 'Inactive' END as status
+          from emails as e 
+          LEFT JOIN faculty as f 
+          USING(faculty_id) 
+          INNER JOIN 
+          class c ON c.faculty_id = e.faculty_id
+          INNER JOIN 
+          section s ON s.section_id = c.section_id
+          WHERE c.school_year = ? AND semester = ?
+          GROUP BY f.lastname
+          `,[school_year, semester]
+      );
+      res.json(rows);
+  } catch (err) {
+      console.log(err.message);
+      res.json(err.message);
+  } finally {
+      await endConnection(conn);
+  }
+})
+router.post("/extendDeadline", async (req, res) => {
+  const conn = await startConnection(req);
+  try {
+    const { email, class_code, deadline_extend_start, deadline_extend_end, school_year, semester } = req.body;
+    const rows = await conn.query(`INSERT INTO upload_grade_extensions 
+      (email,
+      class_code,
+      deadline_extend_start,
+      deadline_extend_end,
+      school_year,
+      semester) 
+      VALUES(?,?,?,?,?,?)`, 
+      [email, class_code, deadline_extend_start, deadline_extend_end, school_year, semester]);
     res.json(rows);
   } catch (err) {
     console.log(err.message);

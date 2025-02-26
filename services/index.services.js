@@ -3,6 +3,7 @@ const isNaNOrNullOrEmpty = (value) => {
 }
 
 const getLoad = async (conn, query, params) => {
+  try {
     const [rows] = await conn.query(
         `SELECT
               c.class_code, 
@@ -14,42 +15,13 @@ const getLoad = async (conn, query, params) => {
                (SELECT timestamp FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code AND term_type = 'finalterm' ORDER BY id DESC LIMIT 1) as endterm_timestamp,
                (SELECT method FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code AND term_type = 'midterm' ORDER BY id DESC LIMIT 1) as midterm_method,
                (SELECT method FROM updates INNER JOIN class USING (class_code) WHERE class_code = c.class_code AND term_type = 'finalterm' ORDER BY id DESC LIMIT 1) as endterm_method,
-               (SELECT 
-                  ul.timestamp 
-                FROM 
-                  tbl_class_update_logs ul 
-                INNER JOIN 
-                  class 
-                USING (class_code) 
-                WHERE 
-                  ul.class_code = c.class_code 
-                AND
-                  ul.action_type = 'Submitted'
-                AND
-                  ul.term_type = 'midterm'
-                ORDER BY 
-                  ul.timestamp DESC LIMIT 1) as midterm_submittedLog,
-                (SELECT 
-                  ul.timestamp 
-                FROM 
-                  tbl_class_update_logs ul 
-                INNER JOIN 
-                  class 
-                USING (class_code) 
-                WHERE 
-                  ul.class_code = c.class_code 
-                AND
-                  ul.action_type = 'Submitted'
-                AND
-                  ul.term_type = 'finalterm'
-                ORDER BY 
-                  ul.timestamp DESC LIMIT 1) as endterm_submittedLog,
                 CASE 
                   WHEN c.subject_code IN (SELECT subject_code FROM graduate_studies) 
                     THEN true
                     ELSE false
                 END as isGraduateStudies,
-                (SELECT midterm_status FROM class_code_status as ccs WHERE ccs.class_code = c.class_code LIMIT 1) as midterm_status
+                (SELECT deadline_extend_end FROM upload_grade_extensions WHERE class_code = c.class_code AND status = 'approved' LIMIT 1) as deadline_extended,
+                (SELECT CASE WHEN deadline_extend_end >= CURDATE() THEN true ELSE false END FROM upload_grade_extensions WHERE class_code = c.class_code AND status = 'approved' ORDER BY deadline_extend_end DESC LIMIT 1) as is_deadline_extended
       FROM class c
       INNER JOIN section s USING (section_id)
       INNER JOIN student_load sl USING (class_code)
@@ -57,6 +29,10 @@ const getLoad = async (conn, query, params) => {
        ${query} GROUP BY c.class_code ORDER BY section`, params
       );
       return rows;
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 }
 
 const getGradeTable = async (conn, decode) => {
@@ -130,7 +106,7 @@ const getExcelFile = async (conn, decode) => {
           c.subject_code, 
           sg.student_grades_id, 
           s.student_id, 
-          CONCAT(s.student_lastname , ', ', s.student_firstname,' ',s.student_middlename) as name, 
+          CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname),' ',TRIM(s.student_middlename)) as name, 
           sg.mid_grade, 
           sg.final_grade, 
           sg.remarks
@@ -150,6 +126,35 @@ const getExcelFile = async (conn, decode) => {
         ORDER BY name`
     );
     return data;
+}
+
+const getGSExcelFile = async (conn, decode) => {
+  const [data] = await conn.query(
+      `SELECT 
+        c.subject_code, 
+        sg.student_grades_id, 
+        s.student_id, 
+        CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname),' ',TRIM(s.student_middlename)) as name, 
+        sg.mid_grade, 
+        sg.final_grade,
+        CASE WHEN sg.grade IS NULL OR sg.grade = '' THEN 0 ELSE sg.grade END as grade, 
+        sg.remarks
+      FROM class c 
+      INNER JOIN student_load sl
+        USING (class_code) 
+      INNER JOIN student s 
+        USING (student_id)
+      INNER JOIN student_grades sg
+        USING (student_id)
+      WHERE 
+        c.class_code = '${decode.classCode}'AND 
+        sg.subject_code = c.subject_code AND
+        sg.school_year = '${decode.currentSchoolYear}' AND 
+        sg.semester = '${decode.semester}' 
+      GROUP BY name
+      ORDER BY name`
+  );
+  return data;
 }
 
 const indexUpdateClassCodeStatus = async (conn, email_used, decodedClassCode) => {
@@ -296,6 +301,7 @@ module.exports = {
     getGradeTable,
     getGraduateStudiesTable,
     getExcelFile,
+    getGSExcelFile,
     indexUpdateClassCodeStatus,
     indexInsertMidtermClassCodeUpdateLog,
     indexUpdateGrade,

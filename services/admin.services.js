@@ -59,8 +59,7 @@ const getAllEmails = async (conn) => {
         from emails as e 
         LEFT JOIN faculty as f 
         USING(faculty_id) 
-        GROUP BY e.id
-        ORDER BY e.id ASC
+        GROUP BY f.lastname
         `
       );
       return rows.length > 0 ? rows : [];
@@ -122,7 +121,7 @@ const getGradeTableService = async (conn, decode) => {
         `SELECT 
           sg.student_grades_id as id, 
           s.student_id, 
-          CONCAT(s.student_lastname , ', ', s.student_firstname) as name, 
+          CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname), TRIM(s.student_middlename)) as name, 
           sg.mid_grade,
           sg.final_grade,
           sg.grade,
@@ -149,8 +148,10 @@ const getGradeTableService = async (conn, decode) => {
         INNER JOIN student_grades sg
           USING (student_id)
         WHERE 
-          c.class_code = '${decode.classCode}'AND 
-          sg.subject_code = c.subject_code
+          c.class_code = '${decode.classCode}' 
+          AND sg.subject_code = c.subject_code
+          AND sg.school_year = c.school_year
+          AND sg.semester = c.semester
         GROUP BY name
         ORDER BY name`
       );
@@ -327,8 +328,9 @@ const getClassStudents = async (conn, req) => {
     USING (student_id)
     WHERE 
       class_code = ?
-    AND 
-      sg.subject_code = c.subject_code 
+      AND sg.subject_code = c.subject_code
+      AND sg.school_year = c.school_year
+      AND sg.semester = c.semester 
     GROUP BY studentName
     ORDER BY studentName`
     const [rows] = await conn.query(query, [classCode]); 
@@ -577,6 +579,30 @@ const getProgramCodesByCampus = async (conn) => {
   return rows.length > 0 ? rows : []
 }
 
+const insertSubjectCodeForGraduateStudies = async (conn) => {
+  const query = `INSERT INTO graduate_studies (subject_code) 
+    SELECT 
+      cs.subject_code
+      FROM 
+        curriculum c
+      LEFT JOIN
+        curriculum_subjects cs
+      ON c.curriculum_id = cs.curriculum_id
+      WHERE 
+        c.curriculum_title 
+      LIKE "%New Curriculum%" 
+      AND c.program_code NOT LIKE "BS%"
+      AND c.program_code NOT LIKE "BT%"
+      AND c.program_code NOT LIKE "AB%"
+      AND c.program_code NOT LIKE "BA%"
+      AND c.program_code NOT LIKE "BE%"
+      AND c.program_code NOT LIKE "BP%"
+      AND c.program_code NOT LIKE "TCP%"
+      AND c.program_code NOT LIKE "BIT%"  
+	  AND subject_code NOT IN(SELECT subject_code FROM graduate_studies)`
+  const [rows] = await conn.query(query);
+  return rows.length > 0 ? rows : []
+}
 module.exports = {
     getCurrentSchedule,
     getEmails,
@@ -603,5 +629,6 @@ module.exports = {
     getStudentGrades,
     getStudentYearSemesterAndSchoolYear,
     getStudentsBySearch,
-    getProgramCodesByCampus
+    getProgramCodesByCampus,
+    insertSubjectCodeForGraduateStudies
 }
