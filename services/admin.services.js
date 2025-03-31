@@ -59,7 +59,7 @@ const getAllEmails = async (conn) => {
         from emails as e 
         LEFT JOIN faculty as f 
         USING(faculty_id) 
-        GROUP BY f.lastname
+        GROUP BY f.lastname, f.firstname, f.middlename
         `
       );
       return rows.length > 0 ? rows : [];
@@ -97,7 +97,9 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
                 class_code_status ccs
               WHERE
                 ccs.class_code = c.class_code LIMIT 1
-            ) as midterm_status
+            ) as midterm_status,
+            (SELECT deadline_extend_end FROM upload_grade_extensions WHERE class_code = c.class_code AND status = 'approved' ORDER BY upload_grade_extension_id DESC LIMIT 1) as deadline_extended,
+            (SELECT CASE WHEN deadline_extend_end >= CURDATE() THEN true ELSE false END FROM upload_grade_extensions WHERE class_code = c.class_code AND status = 'approved' ORDER BY deadline_extend_end DESC LIMIT 1) as is_deadline_extended
       FROM 
         class c
       INNER JOIN 
@@ -121,7 +123,7 @@ const getGradeTableService = async (conn, decode) => {
         `SELECT 
           sg.student_grades_id as id, 
           s.student_id, 
-          CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname), TRIM(s.student_middlename)) as name, 
+          CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname), ' ', TRIM(s.student_middlename)) as name, 
           sg.mid_grade,
           sg.final_grade,
           sg.grade,

@@ -15,7 +15,17 @@ const RegistrarActivityService = {
     },
     updateDataById: async (conn, req) => {
         const { activity, schoolyear, semester, status, from, to, currentSem, termType, id } = req.body
-        const [rows] = await conn.query("UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?, currentSem = ?, term_type = ? WHERE id = ?", [activity, schoolyear, semester, status, from, to, currentSem, termType, id])
+        
+        // First update registrar_activity_online
+        const [rows] = await conn.query("UPDATE registrar_activity_online SET activity = ?, schoolyear = ?, semester = ?, status = ?, `from` = ?, `to` = ?, currentSem = ?, term_type = ? WHERE id = ?", [activity, schoolyear, semester, status, from, to, currentSem, termType, id]);
+
+        // Dynamically construct column name for `class_code_status`
+        const columnName = `${termType}_status`; // Example: 'midterm_status' or 'endterm_status'
+
+        // Second update class_code_status
+        await conn.query(`UPDATE class_code_status 
+        SET \`${columnName}\` = ? 
+        WHERE class_code IN (SELECT class_code FROM class WHERE school_year = ? AND semester = ?)`, [0, schoolyear, semester])
         return rows;
     },
 }

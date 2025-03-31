@@ -29,8 +29,6 @@ const RegistrarActivityController = {
         try {
           const rows = await RegistrarActivityService.getDataByEncodedSemester(conn, req);
           res.status(200).json(rows[0] || [])
-          console.log(rows[0]);
-          
         } catch(err) {
           console.error(err.message);
         } finally {

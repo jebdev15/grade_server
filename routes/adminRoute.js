@@ -424,7 +424,7 @@ router.get("/getAllEmailsForExtension", async (req, res) => {
           INNER JOIN 
           section s ON s.section_id = c.section_id
           WHERE c.school_year = ? AND semester = ?
-          GROUP BY f.lastname
+          GROUP BY f.lastname, f.firstname, f.middlename
           `,[school_year, semester]
       );
       res.json(rows);
@@ -435,19 +435,98 @@ router.get("/getAllEmailsForExtension", async (req, res) => {
       await endConnection(conn);
   }
 })
-router.post("/extendDeadline", async (req, res) => {
+
+const extendUploadingOfGradeByClassCode = async (conn, rowsContainer, email, class_codes, deadline_extend_start, deadline_extend_end, school_year, semester) => {
+  try {
+    for (const class_code of class_codes.split(",")) {
+      const params = [ email, class_code, deadline_extend_start, deadline_extend_end, school_year, semester, "approved" ];
+      const [rows] = await conn.query(`INSERT INTO upload_grade_extensions 
+        (email, class_code, deadline_extend_start, deadline_extend_end, school_year, semester, status) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+        params);
+
+      if (rows.affectedRows) {
+        await conn.query(`UPDATE class_code_status SET midterm_status = 0, endterm_status = 0 WHERE class_code = ?`, [class_code]);
+        rowsContainer.push(1);
+      }
+    }
+  } catch (error) {
+    console.log(error)
+    return { insertedRows: 0 };
+  } 
+}
+
+const updateClassCodeStatusByClassCode = async (conn, email, class_codes, term_type) => {
+  try {
+      const [rows] = await conn.query("UPDATE class_code_status SET ? WHERE class_code IN (?)", [{ [term_type]: 0 }, class_codes.split(",")]);
+
+      if (rows.affectedRows) {
+        const { bulkInsertLogsAffectedRows } = await bulkInsertLogs(conn, email, term_type, class_codes.split(","));
+        console.log({ bulkInsertLogsAffectedRows });
+        return { insertedRows: bulkInsertLogsAffectedRows };
+      }
+      return { insertedRows: 0 };
+  } catch (error) {
+    console.log(error)
+    return { insertedRows: 0 };
+  } 
+}
+
+const bulkInsertLogs = async (conn, email, term_type, class_codes) => {
+  const termType = term_type.split("_")[0];
+  if (class_codes.length === 0) return;
+
+  // Create placeholders (?, ?, ?, ?), (?, ?, ?, ?), ...
+  const placeholders = class_codes.map(() => "(?, ?, ?, ?)").join(", ");
+
+  // Flatten the values: [email, "Unlocked", term_type, class_code1, email, "Unlocked", term_type, class_code2, ...]
+  const values = class_codes.flatMap(class_code => [email, "Unlocked", termType, class_code]);
+
+  // Execute the bulk INSERT query
+  const [rows] = await conn.query(
+      `INSERT INTO tbl_class_update_logs (email_used, action_type, term_type, class_code) VALUES ${placeholders}`,
+      values
+  );
+  return { bulkInsertLogsAffectedRows: rows.affectedRows };
+};
+
+router.post("/extendUploadingOfGradeByClassCode", async (req, res) => {
+  const conn = await startConnection(req);
+  const { class_codes, deadline_extend_start, deadline_extend_end, schoolyear: school_year, semester } = req.body;
+  try {
+    const rowsContainer = []
+    const { email } = req.cookies;
+    await extendUploadingOfGradeByClassCode(conn, rowsContainer, email, class_codes, deadline_extend_start, deadline_extend_end, school_year, semester)
+    res.json({message: "Successfully Added"});
+  } catch (err) {
+    console.log(err.message);
+    res.json(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.put("/updateClassCodeStatusByClassCode", async (req, res) => {
+  const conn = await startConnection(req);
+  const { class_codes, term_type } = req.body;
+  try {
+    const { email } = req.cookies;
+    const { insertedRows } = await updateClassCodeStatusByClassCode(conn, email, class_codes, term_type)
+    console.log({ insertedRows })
+    res.json({message: insertedRows > 0 ? "Successfully Updated" : "Failed to Update"});
+  } catch (err) {
+    console.log(err.message);
+    res.json(err.message);
+  } finally {
+    await endConnection(conn);
+  }
+})
+
+router.post("addGraduateStudiesSubjectCode", async (req, res) => {
   const conn = await startConnection(req);
   try {
-    const { email, class_code, deadline_extend_start, deadline_extend_end, school_year, semester } = req.body;
-    const rows = await conn.query(`INSERT INTO upload_grade_extensions 
-      (email,
-      class_code,
-      deadline_extend_start,
-      deadline_extend_end,
-      school_year,
-      semester) 
-      VALUES(?,?,?,?,?,?)`, 
-      [email, class_code, deadline_extend_start, deadline_extend_end, school_year, semester]);
+    const { subject_code } = req.body;
+    const [rows] = await conn.query(`INSERT INTO graduate_studies (subject_code) VALUES (?)`, [subject_code]);
     res.json(rows);
   } catch (err) {
     console.log(err.message);

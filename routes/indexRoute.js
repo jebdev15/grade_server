@@ -21,10 +21,10 @@ const {
   indexUpdateClassCodeStatus,
   indexUpdateGrade,
   indexUpdateGraduateStudiesGrade,
-  indexInsertMidtermClassCodeUpdateLog,
   getGSExcelFile
 } = require("../services/index.services");
 const RegistrarActivityController = require("../controllers/registrarActivityController");
+const { GradeUtil } = require("../utils/gradeUtils");
 
 router.get('/getClassGraduateStudiesStudents', async (req, res) => {
   const { class_code, semester, currentSchoolYear } = req.query;
@@ -48,15 +48,18 @@ router.get('/getClassGraduateStudiesStudents', async (req, res) => {
         class c 
       INNER JOIN 
         student_load sl
-      USING (class_code) 
+      ON 
+        c.class_code = sl.class_code
       INNER JOIN 
         student s 
-      USING (student_id)
+      ON 
+        s.student_id = sl.student_id
       INNER JOIN 
         student_grades sg
-      USING (student_id)
+      ON 
+        sg.student_id = sl.student_id
       WHERE 
-        class_code = '${decode.classCode}'
+        c.class_code = '${decode.classCode}'
       AND 
         sg.subject_code = c.subject_code 
       AND
@@ -69,6 +72,7 @@ router.get('/getClassGraduateStudiesStudents', async (req, res) => {
     await endConnection(conn);
     res.status(200).json(rows);
   } catch (error) {
+    console.error(error);
     res.status(500).json(error.message);
   }
 });
@@ -106,15 +110,18 @@ router.get('/getClassStudents', async (req, res) => {
         class c 
       INNER JOIN 
         student_load sl
-      USING (class_code) 
+      ON 
+        c.class_code = sl.class_code
       INNER JOIN 
         student s 
-      USING (student_id)
+      ON
+        s.student_id = sl.student_id
       INNER JOIN 
         student_grades sg
-      USING (student_id)
+      ON 
+        sg.student_id = sl.student_id
       WHERE 
-        class_code = '${decode.classCode}'
+        c.class_code = '${decode.classCode}'
       AND 
         sg.subject_code = c.subject_code 
       AND
@@ -205,12 +212,13 @@ router.get('/getLastGradeSheetSubmittedLog', async (req, res) => {
 
 router.get("/getLoad", async (req, res) => {
   const { faculty_id, school_year, semester, class_code } = req.query;
-  const query = class_code ? `AND class_code = ?` : "" 
+  
+  const query = class_code ? `AND c.class_code = ?` : "" 
   const params = class_code ? [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester), urlDecode(class_code)] : [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester)]
   const conn = await startConnection(req);
   try {
     const rows = await getLoad(conn, query, params);
-    res.status(200).json(rows);
+    res.json(rows);
   } catch (err) {
     console.log(err.message);
     res.status(500).json(err.message);
@@ -643,26 +651,7 @@ router.get("/getGSExcelFile", async (req, res) => {
     bold: true,
     size: 13,
   };
-  sheet.getRow(11).values = [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "Note:",
-    "",
-  ];
-  sheet.getRow(12).values = [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "Please don't overwrite this column",
-    "",
-  ];
+
   sheet.getRow(13).values = [
     "Grade ID",
     "Student ID",
@@ -683,7 +672,7 @@ router.get("/getGSExcelFile", async (req, res) => {
     { key: "mid_grade", width: 10 },
     { key: "final_grade", width: 10 },
     { key: "grade", width: 10 },
-    { key: "status", width: 35 },
+    { key: "status", width: 15 },
     { key: "remarks", width: 12 },
   ];
   data.forEach((item, i) => {
@@ -867,11 +856,11 @@ router.post(
       const extractRowData = (row) => {
         return [
           row.values[1],
-          row.values[4],
-          row.values[5],
-          row.getCell(6).result,
-          row.getCell(7).result,
-          row.values[8],
+          GradeUtil.getVerifiedCellValue(row, 4),
+          GradeUtil.getVerifiedCellValue(row, 5),
+          GradeUtil.getVerifiedCellValue(row, 6),
+          GradeUtil.getVerifiedCellValueForRemark(row, 7),
+          GradeUtil.getVerifiedCellValueForRemark(row, 8),
           row.values[3],
         ];
       };
@@ -879,16 +868,13 @@ router.post(
       const conn = await startConnection(req);
       const userName = await eventkeyUserEmailRef(conn, email_used);
       const modifiedEventKey = await insertModifiedEventLog(conn, "modified_eventlog", "student_grades", userName, "Registrar", req.ip);
-      const [rows, fields] = await conn.query(
-        "SELECT subject_code FROM class WHERE class_code = ?",
-        [decodeClassCode]
-      );
+      const [rows] = await conn.query("SELECT subject_code FROM class WHERE class_code = ?", [decodeClassCode]);
       const subjectCode = rows[0].subject_code;
-      const processRow = async (rowData, finalRemark) => {
+      const processRow = async (rowData) => {
         try {
-           const rows = await checkIfHasRemarkInGradeSheet(conn, rowData, subjectCode, finalRemark, modifiedEventKey);
+           const rows = await checkIfHasRemarkInGradeSheet(conn, rowData, subjectCode, modifiedEventKey);
           
-          rows.changedRows 
+          rows.affectedRows 
           ? updatedData(rowData[6], 1)
           : noUpdateData(rowData[6], 1)
           await conn.execute(
@@ -898,7 +884,7 @@ router.post(
           return rows.changedRows;
         } catch (err) {
           if (err) {
-            console.error(err.message);
+            console.error({processRowError: err.message});
           }
         }
       }
@@ -906,29 +892,11 @@ router.post(
       sheet.eachRow({ includeEmpty: true }, async (row, rowNumber) => {
         if (rowNumber > 13) {
           const rowData = extractRowData(row);
-          let finalRemark = "";
-          if (rowData[4]) finalRemark = rowData[4].toLowerCase();
-          else {
-            switch (rowData[5]) {
-              case "Incomplete":
-                finalRemark = "inc";
-                break;
-              case "Dropped":
-                finalRemark = "drp";
-                break;
-              case "No Attendance":
-                finalRemark = "na";
-                break;
-              case "Withdrawn":
-                finalRemark = "w";
-                break;
-              default:
-                break;
-            }
-          }
+          
           try {
-            await processRow(rowData, finalRemark);
+            await processRow(rowData);
           } catch (error) {
+            noUpdateData(rowData[6], 1)
             res.status(500).send(error.message);
           }
         }
@@ -941,6 +909,7 @@ router.post(
       ]);
       await endConnection(conn);
       await fs.unlink(uploadFile.path);
+      console.log(updateDataContainer)
       res.status(200).json({isOkay: 1, isError: 0, updateDataContainer: updateDataContainer});
     } else {
       res.json({isOkay: 1, isError: 1, updateDataContainer: {}});
@@ -975,11 +944,11 @@ router.post(
       const extractRowData = (row) => {
         return [
           row.values[1],
-          row.values[4],
-          row.values[5],
-          row.values[6],
-          row.getCell(7).result,
-          row.values[8],
+          GradeUtil.getVerifiedCellValue(row,4),
+          GradeUtil.getVerifiedCellValue(row,5),
+          GradeUtil.getVerifiedCellValue(row,6),
+          GradeUtil.getVerifiedCellValue(row,7),
+          GradeUtil.getVerifiedCellValue(row,8),
           row.values[3],
         ];
       };
@@ -1018,7 +987,7 @@ router.post(
       await conn.query("INSERT INTO updates(class_code, method, term_type) VALUES(?, ?, ?)", [decodeClassCode,method,term_type]);
       await endConnection(conn);
       await fs.unlink(uploadFile.path);
-      res.status(200).json({isOkay: 1, isError: 0, updateDataContainer: updateDataContainer});
+      res.status(200).json({isOkay: 1, isError: 0, updateDataContainer});
     } else {
       res.json({isOkay: 1, isError: 1, updateDataContainer: {}});
     }
@@ -1026,29 +995,11 @@ router.post(
 );
 
 router.post('/submitGradeSheet', async (req, res) => {
-  const {class_code, status, email_used} = req.body;
-  const classCodeDecode = urlDecode(class_code);
-
+  const {class_code, email_used, term_type} = req.body;
   let response = {};
   const conn = await startConnection(req);
   try {
-      response = await indexUpdateClassCodeStatus(conn, email_used, classCodeDecode);
-  } catch(err) {
-      response = {"success": false ,"message": "Failed to Update", "error": err.message}
-      console.error(err.message);
-  } finally {
-    await endConnection(conn);
-  }
-  res.json(response)
-})
-
-router.post('/submitMidtermGradeSheet', async (req, res) => {
-  const {class_code, email_used} = req.body;
-  const classCodeDecode = urlDecode(class_code);
-  let response = {};
-  const conn = await startConnection(req);
-  try {
-      response = await indexInsertMidtermClassCodeUpdateLog(conn, email_used, classCodeDecode);
+      response = await indexUpdateClassCodeStatus(conn, email_used, class_code, term_type);
   } catch(err) {
       response = {"success": false ,"message": "Failed to Update", "error": err.message}
       console.error(err.message);
