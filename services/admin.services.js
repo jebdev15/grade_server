@@ -72,44 +72,45 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
           c.subject_code,
           CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
           COUNT(DISTINCT student_id) as noStudents,
-          c.status,
-          (SELECT timestamp FROM updates u WHERE u.class_code = c.class_code ORDER BY id DESC LIMIT 1) as timestamp,
-          (SELECT method FROM updates u WHERE u.class_code = c.class_code ORDER BY u.id DESC LIMIT 1) as method,
-          (SELECT 
-              ul.timestamp 
-            FROM 
-              tbl_class_update_logs ul 
-            WHERE 
-              ul.class_code = c.class_code 
-            AND
-              ul.action_type = 'Submitted'
-            ORDER BY 
-              ul.timestamp DESC LIMIT 1) as submittedLog,
+          -- (SELECT timestamp FROM updates u WHERE u.class_code = c.class_code ORDER BY id DESC LIMIT 1) as timestamp,
+          -- (SELECT method FROM updates u WHERE u.class_code = c.class_code ORDER BY u.id DESC LIMIT 1) as method,
+          MAX(u.timestamp) as timestamp,
+          MAX(u.method) AS method, 
+          MAX(CASE WHEN ul.action_type = 'Submitted' THEN ul.timestamp END) AS submittedLog,
+          MAX(CASE WHEN ul.action_type = 'Submitted' THEN 'Submitted' ELSE '' END) AS hasBeenSubmitted,
             CASE 
               WHEN c.subject_code IN (SELECT subject_code FROM graduate_studies) 
                 THEN true
                 ELSE false
             END as isGraduate,
-            (
-              SELECT
-                midterm_status
-              FROM
-                class_code_status ccs
-              WHERE
-                ccs.class_code = c.class_code LIMIT 1
-            ) as midterm_status,
-            (SELECT deadline_extend_end FROM upload_grade_extensions WHERE class_code = c.class_code AND status = 'approved' ORDER BY upload_grade_extension_id DESC LIMIT 1) as deadline_extended,
-            (SELECT CASE WHEN deadline_extend_end >= CURDATE() THEN true ELSE false END FROM upload_grade_extensions WHERE class_code = c.class_code AND status = 'approved' ORDER BY deadline_extend_end DESC LIMIT 1) as is_deadline_extended
-      FROM 
-        class c
-      INNER JOIN 
-        section s 
-      USING (section_id)
-      INNER JOIN 
-        student_load sl 
-      USING (class_code)
-      WHERE c.faculty_id = ? AND c.school_year = ? AND c.semester = ?
-       ${sqlParams} GROUP BY c.class_code ORDER BY section`,
+            CASE WHEN rao.term_type = 'midterm' THEN ccs.midterm_status ELSE ccs.endterm_status END as classLoadStatus,
+            MAX(CASE WHEN uge.status = 'approved' AND uge.deadline_extend_end THEN uge.deadline_extend_end END) as deadline_extended,
+            MAX(CASE WHEN uge.status = 'approved' AND uge.deadline_extend_end >= CURDATE() THEN TRUE ELSE FALSE END) as is_deadline_extended
+        FROM 
+          class c
+        INNER JOIN 
+          section s 
+        ON s.section_id = c.section_id
+        INNER JOIN 
+          student_load sl
+        ON sl.class_code = c.class_code
+        INNER JOIN
+          registrar_activity_online rao
+        ON rao.schoolyear = c.school_year AND rao.semester = c.semester
+        LEFT JOIN
+          class_code_status ccs
+        ON ccs.class_code = c.class_code
+        LEFT JOIN
+          tbl_class_update_logs ul
+        ON ul.class_code = c.class_code
+        LEFT JOIN 
+          updates u
+        ON u.class_code = c.class_code
+        LEFT JOIN
+          upload_grade_extensions uge
+        ON uge.class_code = c.class_code
+        WHERE c.faculty_id = ? AND c.school_year = ? AND c.semester = ?
+        ${sqlParams} GROUP BY c.class_code ORDER BY section`,
        params
       );
       const data = rows.length > 0 ? rows : [];
