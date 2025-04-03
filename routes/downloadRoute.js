@@ -1,11 +1,7 @@
 const express = require("express");
-const multer = require("multer");
-const fs = require("fs/promises");
-const upload = multer({ dest: "./tmp/" });
 const router = express.Router();
 const { startConnection, endConnection } = require("../config/conn");
 const ExcelJS = require("exceljs");
-const { urlDecode } = require('url-encode-base64')
 
 const getCampus = (req) => {
   const referer = req.headers.referer || req.headers.referrer;
@@ -39,232 +35,67 @@ const getCampus = (req) => {
   return campusInfoValue
 }
 
-// 1st Download Grade Sheet Submission Logs
-// router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
-//     const {toGenerate, schoolYear, semester} = req.query;
-//     const campusInfoValue = getCampus(req);
-//     let currentSemester;
-//     switch(semester) {
-//       case "1st":
-//         currentSemester = "First Semester";
-//         break;
-//       case "2nd":
-//         currentSemester = "Second Semester";
-//         break;
-//       case "summer":
-//         currentSemester = "Summer";
-//         break;
-//     }
-//     const conn = await startConnection(req);
-//     try {
-//         const [rows] = await conn.query(`select 
-//                                             (select CONCAT(f.lastname,' ',f.firstname) from faculty f inner join class c where u.class_code = c.class_code and f.faculty_id = c.faculty_id) as fullName,
-//                                             u.class_code, 
-//                                             (select CONCAT(sec.program_code,' ',sec.yearlevel,' ',sec.section_code) from section sec inner join class c using(section_id) where c.class_code = u.class_code) as section,
-//                                             u.timestamp, 
-//                                           u.method as updateMethod
-//                                             from updates u
-//                                           inner join class c
-//                                             using(class_code)
-//                                           where c.school_year = ? and c.semester = ?
-//                                           order by u.timestamp desc
-//                                         `,[schoolYear, semester]);   
-//         await endConnection(conn);   
-//         const workbook = new ExcelJS.Workbook();
-//         workbook.creator = "CHMSU Grading System";
-//         workbook.created = new Date();
-//         workbook.calcProperties.fullCalcOnLoad = true;          
-//         const sheet = workbook.addWorksheet("Logs", {
-//             pageSetup: {
-//               fitToPage: true,
-//               orientation: "portrait",
-//               margins: {
-//                 left: 0.5,
-//                 right: 0.5,
-//                 top: 0.5,
-//                 bottom: 0.5,
-//                 header: 0,
-//                 footer: 0,
-//               },
-//             },
-//           });    
-//         //HEADER
-//         sheet.mergeCells("A1", "H1");
-//         const republic = sheet.getCell("A1");
-//         republic.value = "Republic of the Philippines";
-//         republic.alignment = {
-//             vertical: "middle",
-//             horizontal: "center",
-//         }; 
-//         sheet.mergeCells("A2", "H2");
-//         const nameofSchool = sheet.getCell("A2");
-//         nameofSchool.value = "CARLOS HILADO MEMORIAL STATE UNIVERSITY";
-//         nameofSchool.alignment = {
-//           vertical: "middle",
-//           horizontal: "center",
-//         };
-//         nameofSchool.font = {
-//           size: 12,
-//           bold: true,
-//         };       
-//         sheet.mergeCells("A3", "H3");
-//         const campusInfo = sheet.getCell("A3");
-//         campusInfo.value = campusInfoValue;
-//         campusInfo.alignment = {
-//             vertical: "middle",
-//             horizontal: "center",
-//         };
-//         const logoPic = workbook.addImage({
-//             filename: `${__dirname}/../public/images/logo.png`,
-//             extension: "png",
-//         });
-//         sheet.addImage(logoPic, {
-//             tl: {
-//                 col: 1,
-//                 row: 1,
-//             },
-//             ext: {
-//                 width: 100,
-//                 height: 100,
-//             },
-//         });
-//         sheet.mergeCells("A5", "H5");
-//         const officeOfReg = sheet.getCell("A5");
-//         officeOfReg.value = "Office of the Registrar";
-//         officeOfReg.alignment = {
-//             vertical: "middle",
-//             horizontal: "center",
-//         };
-//         officeOfReg.font = {
-//             size: 12,
-//             bold: true,
-//         };
-        
-//         sheet.mergeCells("A6", "H6");
-//         const gradeSheetTitle = sheet.getCell("A6");
-//         gradeSheetTitle.alignment = {
-//             vertical: "middle",
-//             horizontal: "center",
-//         };
-//         gradeSheetTitle.value=toGenerate;
-  
-//         sheet.mergeCells("A7", "H7");
-//         const academicYear = sheet.getCell("A7");
-//         academicYear.alignment = {
-//             vertical: "middle",
-//             horizontal: "center",
-//         };
-//         academicYear.value=`Academic Year ${schoolYear} - ${parseInt(schoolYear) + 1}, ${currentSemester}`
-  
-  
-//         sheet.getRow(9).values = [
-//             'Full Name',
-//             'Class Code',
-//             'Program/Year/Section',
-//             'Update Method',
-//             'Timestamp'
-//         ]
-//         sheet.getRow(9).font = {
-//             bold: true,
-//             size: 13,
-//         };
-  
-//         sheet.columns = [
-//             { key: 'fullName', width: 30 },
-//             { key: 'class_code', width: 15 },
-//             { key: 'section', width: 25 },
-//             { key: 'updateMethod', width: 20 },
-//             { key: 'timestamp', width: 25, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
-//         ]
-  
-//         const dateFormatter = (date) => {
-//           const newDateTime = new Date(date);
-      
-//           const formattedDate = newDateTime.toLocaleString("en-PH", {
-//             month: "long", // Full month name
-//             day: "numeric", // Day of the month
-//             year: "numeric", // Full year
-//             hour: "numeric", // Display Hour/s
-//             minute: "numeric", // Display Minute/s
-//           });
-      
-//           return formattedDate;
-//         };
-  
-//         rows.forEach((item, i) => {
-//             const {
-//                 fullName,
-//                 class_code,
-//                 section,
-//                 updateMethod,
-//                 timestamp,
-//             } = item;
-  
-//             const row = sheet.getRow(i + 10);
-//             row.font = {
-//                 size: 13,
-//             }
-  
-//             row.values = {
-//                 fullName,
-//                 class_code,
-//                 section,
-//                 updateMethod,
-//                 timestamp: dateFormatter(timestamp)
-//             }
-//         })
-  
-//         res.setHeader(
-//             "Content-Type",
-//             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-//         );
-//         res.setHeader("Content-Disposition", "attachment; filename=" + "File.xlsx");
-//         workbook.xlsx.write(res).then(() => res.end());
-//     } catch(err) {
-//       res.status(500).json(err.message);
-//       console.error(err.message);
-//     }
-// })
-
-// 2nd Download Grade Sheet Submission Logs(currently used)
+const getCurrentSemester = (semester) => {
+  let currentSemester;
+  switch(semester) {
+    case "1st":
+      currentSemester = "First Semester";
+      break;
+    case "2nd":
+      currentSemester = "Second Semester";
+      break;
+    case "summer":
+      currentSemester = "Summer";
+      break;
+  }
+  return { currentSemester }
+}
+// Download Grade Sheet Submission Logs(currently used)
 router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
   const {toGenerate, schoolYear, semester} = req.query;
-  let currentSemester;
-    switch(semester) {
-      case "1st":
-        currentSemester = "First Semester";
-        break;
-      case "2nd":
-        currentSemester = "Second Semester";
-        break;
-      case "summer":
-        currentSemester = "Summer";
-        break;
-    }
+  const { currentSemester } = getCurrentSemester(semester);
   const campusInfoValue = getCampus(req);
   const conn = await startConnection(req);
   try {
-      const [rows] = await conn.query(`select 
-                                      cl.*,
-                                      c.subject_code,
-                                      CONCAT(sec.program_code, sec.yearlevel, ' - ', sec.section_code) as section,
-                                      c.school_year,
-                                      c.semester   
-                                      from 
-                                      tbl_class_update_logs cl
-                                      inner join 
-                                      class c
-                                      using (class_code) 
-                                      inner join section sec
-                                      using (section_id)
-                                      inner join
-                                      emails e
-                                      where c.school_year = ? and c.semester = ?
-                                      and cl.email_used = e.email
-                                      and e.accessLevel NOT IN(?, ?)
-                                      order by cl.timestamp desc`, 
-                                      [schoolYear, semester, 'Administrator', 'Registrar']);   
-      await endConnection(conn);   
+      const [rows] = await conn.query(`SELECT 
+                                        CONCAT(TRIM(f.lastname),', ',TRIM(f.firstname)) as fullName,
+                                        COALESCE(cl.email_used,e.email) AS email_used,
+                                        c.class_code,
+                                        c.subject_code,
+                                        CONCAT(sec.program_code, ' ', sec.yearlevel, ' - ', sec.section_code) as section,
+                                        c.school_year,
+                                        c.semester,
+                                        COALESCE(u.term_type,cl.term_type) as term_type,
+                                        MAX(u.timestamp) as lastUpdate,
+                                        MAX(CASE WHEN cl.action_type = 'Submitted' THEN cl.timestamp END) AS submittedAt
+                                      FROM 
+                                        updates u
+                                      LEFT JOIN class c
+                                        ON c.class_code = u.class_code
+                                      LEFT JOIN faculty f
+                                        ON f.faculty_id = c.faculty_id
+                                      LEFT JOIN section sec
+                                        ON sec.section_id = c.section_id
+                                      LEFT JOIN tbl_class_update_logs cl 
+                                        ON cl.class_code = u.class_code
+                                        AND cl.term_type = u.term_type
+                                      LEFT JOIN emails e
+                                        ON e.faculty_id = f.faculty_id
+                                      WHERE c.school_year = ? 
+                                        AND c.semester = ?
+                                      GROUP BY 
+                                        f.lastname, f.firstname, 
+                                        c.class_code, 
+                                        c.subject_code, 
+                                        sec.program_code, 
+                                        sec.yearlevel, 
+                                        sec.section_code, 
+                                        c.school_year, 
+                                        c.semester,
+                                        u.term_type
+                                      ORDER BY 
+                                          fullName`, 
+                                      [schoolYear, semester, 'Administrator', 'Registrar']);     
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "CHMSU Grading System";
       workbook.created = new Date();
@@ -352,6 +183,7 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
       academicYear.value=`Academic Year: ${schoolYear} - ${parseInt(schoolYear) + 1}, ${currentSemester}`;
 
       sheet.getRow(9).values = [
+          'Full Name',
           'Email Used',
           'Class Code',
           'Subject Code',
@@ -359,7 +191,8 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
           'School Year',
           'Semester',
           'Term Type',
-          'Timestamp'
+          'Last Update',
+          'Submitted'
       ]
       sheet.getRow(9).font = {
           bold: true,
@@ -367,14 +200,16 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
       };
 
       sheet.columns = [
-          { key: 'email_used', width: 30 },
+          { key: 'fullName', width: 40 },
+          { key: 'email_used', width: 40 },
           { key: 'class_code', width: 15 },
           { key: 'subject_code', width: 15 },
-          { key: 'section', width: 15 },
+          { key: 'section', width: 30 },
           { key: 'school_year', width: 15 },
           { key: 'semester', width: 15 },
           { key: 'term_type', width: 15 },
-          { key: 'timestamp', width: 25, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
+          { key: 'lastUpdate', width: 30, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
+          { key: 'submittedAt', width: 30, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
       ]
 
       const dateFormatter = (date) => {
@@ -393,6 +228,7 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
 
       rows.forEach((item, i) => {
           const {
+            fullName,
             email_used,
             class_code,
             subject_code,
@@ -400,7 +236,8 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
             school_year,
             semester,
             term_type,
-            timestamp,
+            lastUpdate,
+            submittedAt
           } = item;
 
           const row = sheet.getRow(i + 10);
@@ -409,6 +246,7 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
           }
 
           row.values = {
+            fullName,
             email_used,
             class_code,
             subject_code,
@@ -416,7 +254,8 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
             school_year: `${school_year}-${school_year + 1}`,
             semester,
             term_type,
-            timestamp: dateFormatter(timestamp)
+            lastUpdate: lastUpdate === null ? '' : dateFormatter(lastUpdate),
+            submittedAt: submittedAt === null ? '' : dateFormatter(submittedAt)
           }
       })
 
@@ -427,8 +266,10 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
       res.setHeader("Content-Disposition", "attachment; filename=" + "File.xlsx");
       workbook.xlsx.write(res).then(() => res.end());
   } catch(err) {
-    res.status(500).json(err.message);
-    console.error(err.message);
+    console.error(err);
+    res.status(500).json(err);
+  } finally {
+    await endConnection(conn);
   }
 })
 
@@ -437,21 +278,22 @@ router.get('/downloadClassStatusLogs', async (req, res) => {
   const campusInfoValue = getCampus(req);
   const conn = await startConnection(req);
   try {
-      const [rows] = await conn.query(`select 
-                                      cl.*,
-                                      CONCAT(sec.program_code, sec.yearlevel, ' - ', sec.section_code) as section,
-                                      c.school_year,
-                                      c.semester   
-                                      from tbl_class_update_logs cl
-                                      left join 
-                                      class c
-                                      using (class_code) 
-                                      left join section sec
-                                      using (section_id)
-                                      where cl.timestamp between ? and ? 
-                                      order by cl.timestamp desc`, 
+      const [rows] = await conn.query(`SELECT 
+                                        cl.*,
+                                        CONCAT(sec.program_code, sec.yearlevel, ' - ', sec.section_code) as section,
+                                        c.school_year,
+                                        c.semester   
+                                      FROM tbl_class_update_logs cl
+                                      LEFT JOIN class c
+                                        ON cl.class_code = c.class_code 
+                                      LEFT JOIN section sec
+                                        ON sec.section_id = c.section_id
+                                      WHERE 
+                                        cl.action_type <> 'Submitted'
+                                        AND cl.timestamp BETWEEN ? and ? 
+                                      ORDER BY 
+                                        cl.timestamp DESC`, 
                                       [from, to]);   
-      await endConnection(conn);   
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "CHMSU Grading System";
       workbook.created = new Date();
@@ -540,11 +382,11 @@ router.get('/downloadClassStatusLogs', async (req, res) => {
 
       sheet.getRow(9).values = [
           'Email Used',
-          'Action Type',
           'Class Code',
           'Program/Year Level/Section',
           'School Year',
           'Semester',
+          'Status',
           'Timestamp'
       ]
       sheet.getRow(9).font = {
@@ -553,12 +395,12 @@ router.get('/downloadClassStatusLogs', async (req, res) => {
       };
 
       sheet.columns = [
-          { key: 'email_used', width: 30 },
-          { key: 'action_type', width: 15 },
+          { key: 'email_used', width: 35 },
           { key: 'class_code', width: 15 },
-          { key: 'section', width: 15 },
+          { key: 'section', width: 25 },
           { key: 'school_year', width: 15 },
           { key: 'semester', width: 15 },
+          { key: 'action_type', width: 15 },
           { key: 'timestamp', width: 25, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
       ]
 
@@ -580,10 +422,10 @@ router.get('/downloadClassStatusLogs', async (req, res) => {
           const {
             email_used,
             action_type,
-            class_code,
             section,
             school_year,
             semester,
+            class_code,
             timestamp,
           } = item;
 
@@ -594,11 +436,11 @@ router.get('/downloadClassStatusLogs', async (req, res) => {
 
           row.values = {
             email_used,
-            action_type,
             class_code,
             section,
             school_year: `${school_year}-${school_year + 1}`,
             semester,
+            action_type,
             timestamp: dateFormatter(timestamp)
           }
       })
@@ -612,6 +454,8 @@ router.get('/downloadClassStatusLogs', async (req, res) => {
   } catch(err) {
     res.status(500).json(err.message);
     console.error(err.message);
+  } finally {
+    await endConnection(conn);
   }
 })
 
