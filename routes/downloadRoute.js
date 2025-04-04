@@ -59,12 +59,9 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
   try {
       const [rows] = await conn.query(`SELECT 
                                         CONCAT(TRIM(f.lastname),', ',TRIM(f.firstname)) as fullName,
-                                        COALESCE(cl.email_used,e.email) AS email_used,
                                         c.class_code,
                                         c.subject_code,
                                         CONCAT(sec.program_code, ' ', sec.yearlevel, ' - ', sec.section_code) as section,
-                                        c.school_year,
-                                        c.semester,
                                         COALESCE(u.term_type,cl.term_type) as term_type,
                                         MAX(u.timestamp) as lastUpdate,
                                         MAX(CASE WHEN cl.action_type = 'Submitted' THEN cl.timestamp END) AS submittedAt
@@ -184,15 +181,12 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
 
       sheet.getRow(9).values = [
           'Full Name',
-          'Email Used',
           'Class Code',
           'Subject Code',
           'Program/Year Level/Section',
-          'School Year',
-          'Semester',
           'Term Type',
           'Last Update',
-          'Submitted'
+          'Submitted At'
       ]
       sheet.getRow(9).font = {
           bold: true,
@@ -201,12 +195,9 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
 
       sheet.columns = [
           { key: 'fullName', width: 40 },
-          { key: 'email_used', width: 40 },
           { key: 'class_code', width: 15 },
           { key: 'subject_code', width: 15 },
           { key: 'section', width: 30 },
-          { key: 'school_year', width: 15 },
-          { key: 'semester', width: 15 },
           { key: 'term_type', width: 15 },
           { key: 'lastUpdate', width: 30, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
           { key: 'submittedAt', width: 30, date: true, numFmt: 'MM/DD/yyyy hh:mm:ss', dateUTC: true },
@@ -229,12 +220,9 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
       rows.forEach((item, i) => {
           const {
             fullName,
-            email_used,
             class_code,
             subject_code,
             section,
-            school_year,
-            semester,
             term_type,
             lastUpdate,
             submittedAt
@@ -247,12 +235,9 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
 
           row.values = {
             fullName,
-            email_used,
             class_code,
             subject_code,
             section,
-            school_year: `${school_year}-${school_year + 1}`,
-            semester,
             term_type,
             lastUpdate: lastUpdate === null ? '' : dateFormatter(lastUpdate),
             submittedAt: submittedAt === null ? '' : dateFormatter(submittedAt)
@@ -479,7 +464,6 @@ router.get('/downloadAccountLogs', async (req, res) => {
                                             from email_logs
                                             where email_logs.created_at between ? and ?
                                         `, [from, to]);   
-        await endConnection(conn);   
         const workbook = new ExcelJS.Workbook();
         workbook.creator = "CHMSU Grading System";
         workbook.created = new Date();
@@ -657,28 +641,18 @@ router.get('/downloadAccountLogs', async (req, res) => {
     } catch(err) {
       res.status(500).json(err.message);
       console.error(err.message);
+    } finally {
+      await endConnection(conn);
     }
 })
 
 router.get('/downloadDeadlineLogs', async (req, res) => {
   const {toGenerate, schoolYear, semester} = req.query;
   const campusInfoValue = getCampus(req);
-  let currentSemester;
-    switch(semester) {
-      case "1st":
-        currentSemester = "First Semester";
-        break;
-      case "2nd":
-        currentSemester = "Second Semester";
-        break;
-      case "summer":
-        currentSemester = "Summer";
-        break;
-    }
+  const { currentSemester } = getCurrentSemester(semester);
   const conn = await startConnection(req);
   try {
       const [rows] = await conn.query(`select * from deadline_log where schoolyear = ? and semester = ? order by timestamp desc`,[schoolYear, semester]);   
-      await endConnection(conn);   
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "CHMSU Grading System";
       workbook.created = new Date();
@@ -768,8 +742,6 @@ router.get('/downloadDeadlineLogs', async (req, res) => {
       sheet.getRow(9).values = [
           'Email Used',
           'Activity',
-          'School Year',
-          'Semester',
           'Status',
           'From',
           'To',
@@ -783,8 +755,6 @@ router.get('/downloadDeadlineLogs', async (req, res) => {
       sheet.columns = [
           { key: 'email_used', width: 20 },
           { key: 'activity', width: 15 },
-          { key: 'schoolyear', width: 25 },
-          { key: 'semester', width: 25 },
           { key: 'status', width: 15 },
           { key: 'from', width: 15 },
           { key: 'to', width: 15 },
@@ -821,8 +791,6 @@ router.get('/downloadDeadlineLogs', async (req, res) => {
           const {
               email_used,
               activity,
-              schoolyear, 
-              semester,
               status,
               from,
               to,
@@ -837,8 +805,6 @@ router.get('/downloadDeadlineLogs', async (req, res) => {
           row.values = {
               email_used,
               activity,
-              schoolyear: `${schoolyear} - ${parseInt(schoolyear)+1}`, 
-              semester,
               status,
               from: dateFormat(from),
               to: dateFormat(to),
@@ -855,6 +821,8 @@ router.get('/downloadDeadlineLogs', async (req, res) => {
   } catch(err) {
     res.status(500).json(err.message);
     console.error(err.message);
+  } finally {
+    await endConnection(conn);
   }
 })
 
