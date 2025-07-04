@@ -59,7 +59,7 @@ const getAllEmails = async (conn) => {
         from emails as e 
         LEFT JOIN faculty as f 
         USING(faculty_id) 
-        GROUP BY f.lastname, f.firstname, f.middlename
+        ORDER BY f.lastname
         `
       );
       return rows.length > 0 ? rows : [];

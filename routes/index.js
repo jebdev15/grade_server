@@ -1,15 +1,12 @@
-const indexRouter = require("./indexRoute");
-const authRouter = require("./authRoute");
-const adminRouter = require("./adminRoute");
-const downloadRouter = require("./downloadRoute");
 const verifyToken = require("../middlewares/verifyToken");
 
 const setupRoutes = (app) => {
-  app.use("/auth", authRouter);
+  app.use("/auth", require("./authRoute"));
   app.use(verifyToken); // this will verify the token before proceeding except auth route
-  app.use("/", indexRouter);
-  app.use("/admin", adminRouter);
-  app.use("/download", downloadRouter);
+  app.use("/", require("./indexRoute"));
+  app.use("/admin", require("./adminRoute"));
+  app.use("/admin-student/grades", require("./admin/student-grades-routes"));
+  app.use("/download", require("./downloadRoute"));
 };
 
 module.exports = setupRoutes;
