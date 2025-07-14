@@ -13,7 +13,7 @@ const SubjectLoadService = {
         const rows = await getSubjectLoad(conn, sqlParams, params);
         return rows
       } catch (err) {
-        console.log(err.message);
+        throw new Error(`Failed to get subject load: ${err.message}`);
       } finally {
         await endConnection(conn);
       }

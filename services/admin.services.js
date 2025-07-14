@@ -2,14 +2,13 @@ const { urlDecode } = require("url-encode-base64");
 const { getStudentsAllowedAccessLevels } = require("../utils/admin.utils");
 
 const getCurrentSchedule = async (conn) => {
-    const [rows] = await conn.query(`select * from registrar_activity`);
-    return rows.length > 0 ? rows : [];
-}
-
+  const [rows] = await conn.query(`select * from registrar_activity`);
+  return rows.length > 0 ? rows : [];
+};
 
 const getEmails = async (conn) => {
   const [rows] = await conn.query(
-      `select DISTINCT
+    `select DISTINCT
       e.id,
       f.lastname as lastName,
       f.firstname as firstName,
@@ -22,11 +21,11 @@ const getEmails = async (conn) => {
       using(faculty_id)`
   );
   return rows.length > 0 ? rows : [];
-}
+};
 
 const getEmailsPerCollegeCode = async (conn, college_code) => {
   const [rows] = await conn.query(
-      `select 
+    `select 
       e.id,
       f.lastname as lastName,
       f.firstname as firstName,
@@ -39,14 +38,15 @@ const getEmailsPerCollegeCode = async (conn, college_code) => {
       on e.faculty_id = f.faculty_id
       where e.college_code = ?
       ORDER BY f.lastname DESC
-      `,[college_code]
+      `,
+    [college_code]
   );
   return rows.length > 0 ? rows : [];
-}
+};
 
 const getAllEmails = async (conn) => {
-    const [rows] = await conn.query(
-        `select 
+  const [rows] = await conn.query(
+    `select 
         e.id,
         f.lastname as lastName,
         f.firstname as firstName,
@@ -61,15 +61,18 @@ const getAllEmails = async (conn) => {
         USING(faculty_id) 
         ORDER BY f.lastname
         `
-      );
-      return rows.length > 0 ? rows : [];
-}
+  );
+  return rows.length > 0 ? rows : [];
+};
 
 const getSubjectLoad = async (conn, sqlParams, params) => {
-    const [rows] = await conn.query(
-        `SELECT 
+  const [rows] = await conn.query(
+    `SELECT 
           c.class_code as id, 
           c.subject_code,
+          c.school_year,
+          c.semester,
+          rao.term_type,
           CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) as section,
           COUNT(DISTINCT student_id) as noStudents,
           -- (SELECT timestamp FROM updates u WHERE u.class_code = c.class_code ORDER BY id DESC LIMIT 1) as timestamp,
@@ -90,38 +93,39 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
           class c
         INNER JOIN 
           section s 
-        ON s.section_id = c.section_id
+          ON s.section_id = c.section_id
         INNER JOIN 
           student_load sl
-        ON sl.class_code = c.class_code
+          ON sl.class_code = c.class_code
         INNER JOIN
           registrar_activity_online rao
-        ON rao.schoolyear = c.school_year AND rao.semester = c.semester
+          ON rao.schoolyear = c.school_year 
+          AND rao.semester = c.semester
         LEFT JOIN
           class_code_status ccs
-        ON ccs.class_code = c.class_code
+          ON ccs.class_code = c.class_code
         LEFT JOIN
           tbl_class_update_logs ul
-        ON ul.class_code = c.class_code
+          ON ul.class_code = c.class_code
         LEFT JOIN 
           updates u
-        ON u.class_code = c.class_code
+          ON u.class_code = c.class_code
         LEFT JOIN
           upload_grade_extensions uge
-        ON uge.class_code = c.class_code
-        WHERE c.faculty_id = ? AND c.school_year = ? AND c.semester = ?
+          ON uge.class_code = c.class_code
+        WHERE c.faculty_id = ? 
+          AND c.school_year = ? 
+          AND c.semester = ?
         ${sqlParams} GROUP BY c.class_code ORDER BY section`,
-       params
-      );
-      const data = rows.length > 0 ? rows : [];
-      console.log({rows, sqlParams, params});
-      return data
-}
+    params
+  );
+  const data = rows.length > 0 ? rows : [];
+  return data;
+};
 
 const getGradeTableService = async (conn, decode) => {
-    
-    const [rows] = await conn.query(
-        `SELECT 
+  const [rows] = await conn.query(
+    `SELECT 
           sg.student_grades_id as id, 
           s.student_id, 
           CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname), ' ', TRIM(s.student_middlename)) as name, 
@@ -157,13 +161,13 @@ const getGradeTableService = async (conn, decode) => {
           AND sg.semester = c.semester
         GROUP BY name
         ORDER BY name`
-      );
-      return rows;
-} 
+  );
+  return rows;
+};
 
 const getGradeSubmissionLogs = async (conn, class_code) => {
-    const [rows] = await conn.query(
-        `select
+  const [rows] = await conn.query(
+    `select
           u.id,
           u.timestamp,
           u.method
@@ -172,52 +176,92 @@ const getGradeSubmissionLogs = async (conn, class_code) => {
           using(class_code)
           where class_code = ?
         `,
-        [urlDecode(class_code)]
-      );
-      return rows.length > 0 ? rows : [];
-}
+    [urlDecode(class_code)]
+  );
+  return rows.length > 0 ? rows : [];
+};
 
 const getAllNoAccounts = async (conn) => {
-    const [data] = await conn.query(`SELECT * FROM faculty WHERE faculty_id NOT IN(SELECT faculty_id FROM emails) AND faculty.status<>? ORDER BY faculty.lastname`,['deleted'])
-    return data.length > 0 ? data : [];
-}
+  const [data] = await conn.query(
+    `SELECT * FROM faculty WHERE faculty_id NOT IN(SELECT faculty_id FROM emails) AND faculty.status<>? ORDER BY faculty.lastname`,
+    ["deleted"]
+  );
+  return data.length > 0 ? data : [];
+};
 
 const updateClassCodeStatus = async (conn, newStatus, classCodeDecode) => {
-    const [rows] = await conn.query(`UPDATE class SET status = ? WHERE class_code = ?`,[newStatus, classCodeDecode]);
-    return rows;
-}
-
-const updateMidtermClassStatusByClassCode = async (conn, newStatus, classCodeDecode) => {
-  const [rows] = await conn.query(`UPDATE class_code_status SET midterm_status = ? WHERE class_code = ?`,[newStatus, classCodeDecode]);
+  const [rows] = await conn.query(
+    `UPDATE class SET status = ? WHERE class_code = ?`,
+    [newStatus, classCodeDecode]
+  );
   return rows;
-}
+};
 
-const insertMidtermClassCodeUpdateLog = async (conn, email_used, newStatus, classCodeDecode) => {
-    const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, newStatus ? 'Locked' : 'Unlocked', classCodeDecode, 'midterm' ]);
-    return logClassStatus
-}
+const updateMidtermClassStatusByClassCode = async (
+  conn,
+  newStatus,
+  classCodeDecode
+) => {
+  const [rows] = await conn.query(
+    `UPDATE class_code_status SET midterm_status = ? WHERE class_code = ?`,
+    [newStatus, classCodeDecode]
+  );
+  return rows;
+};
 
-const insertClassCodeUpdateLog = async (conn, email_used, newStatus, classCodeDecode) => {
-  const [logClassStatus] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, newStatus ? 'Locked' : 'Unlocked', classCodeDecode, 'finalterm' ]);
-  return logClassStatus
-}
+const insertMidtermClassCodeUpdateLog = async (
+  conn,
+  email_used,
+  newStatus,
+  classCodeDecode
+) => {
+  const [logClassStatus] = await conn.query(
+    `INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`,
+    [email_used, newStatus ? "Locked" : "Unlocked", classCodeDecode, "midterm"]
+  );
+  return logClassStatus;
+};
+
+const insertClassCodeUpdateLog = async (
+  conn,
+  email_used,
+  newStatus,
+  classCodeDecode
+) => {
+  const [logClassStatus] = await conn.query(
+    `INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`,
+    [
+      email_used,
+      newStatus ? "Locked" : "Unlocked",
+      classCodeDecode,
+      "finalterm",
+    ]
+  );
+  return logClassStatus;
+};
 
 const getColleges = async (conn) => {
-    const [rows] = await conn.query(`SELECT * FROM college`)
-    return rows
-}
+  const [rows] = await conn.query(`SELECT * FROM college`);
+  return rows;
+};
 
 const checkNewCollege = async (conn, college_code, college_desc) => {
-    const [rows] = await conn.query(`SELECT * FROM college WHERE college_code = ? AND college_desc = ?`, [college_code, , college_desc]);
-    return rows
-}
+  const [rows] = await conn.query(
+    `SELECT * FROM college WHERE college_code = ? AND college_desc = ?`,
+    [college_code, , college_desc]
+  );
+  return rows;
+};
 const saveCollege = async (conn, college_code, college_desc) => {
-    const [rows] = await conn.query(`INSERT INTO college VALUES(?,?)`, [college_code, college_desc]);
-    return rows
-}
+  const [rows] = await conn.query(`INSERT INTO college VALUES(?,?)`, [
+    college_code,
+    college_desc,
+  ]);
+  return rows;
+};
 
 const getProgramCodes = async (conn) => {
-    const [rows] = await conn.query(`SELECT 
+  const [rows] = await conn.query(`SELECT 
       curriculum_id, 
       program_code 
       FROM 
@@ -232,31 +276,39 @@ const getProgramCodes = async (conn) => {
       AND program_code NOT LIKE "BE%"
       AND program_code NOT LIKE "BP%"
       AND program_code NOT LIKE "TCP%"
-      AND program_code NOT LIKE "BIT%"`)
-    return rows
-}
+      AND program_code NOT LIKE "BIT%"`);
+  return rows;
+};
 
 const getSubjectCodes = async (conn, curriculum_id) => {
-    const [rows] = await conn.query(`SELECT 
+  const [rows] = await conn.query(
+    `SELECT 
       DISTINCT subject_code 
       FROM 
       curriculum_subjects
       WHERE 
       curriculum_id = ?
       AND subject_code NOT IN(SELECT subject_code FROM graduate_studies)
-      ORDER BY subject_code DESC`, [curriculum_id])
-    return rows
-}
+      ORDER BY subject_code DESC`,
+    [curriculum_id]
+  );
+  return rows;
+};
 
 const saveSubjectCode = async (conn, subject_code) => {
-    const [rows] = await conn.query(`INSERT INTO graduate_studies(subject_code) VALUES(?)`, [subject_code]);
-    return rows
-}
+  const [rows] = await conn.query(
+    `INSERT INTO graduate_studies(subject_code) VALUES(?)`,
+    [subject_code]
+  );
+  return rows;
+};
 
 const getDeadlineLogs = async (conn) => {
-    const [rows] = await conn.query(`SELECT * FROM deadline_log ORDER BY id DESC`)
-    return rows
-}
+  const [rows] = await conn.query(
+    `SELECT * FROM deadline_log ORDER BY id DESC`
+  );
+  return rows;
+};
 
 const getClassCodeDetails = async (conn, req) => {
   const { class_code } = req.query;
@@ -291,10 +343,10 @@ const getClassCodeDetails = async (conn, req) => {
       subject sub
     USING (subject_code)
     WHERE 
-      c.class_code = ?`
-    const [rows] = await conn.query(query, [classCode]);
-    return rows
-}
+      c.class_code = ?`;
+  const [rows] = await conn.query(query, [classCode]);
+  return rows;
+};
 
 const getClassStudents = async (conn, req) => {
   const { class_code } = req.query;
@@ -335,13 +387,13 @@ const getClassStudents = async (conn, req) => {
       AND sg.school_year = c.school_year
       AND sg.semester = c.semester 
     GROUP BY studentName
-    ORDER BY studentName`
-    const [rows] = await conn.query(query, [classCode]); 
-    return rows
-}
+    ORDER BY studentName`;
+  const [rows] = await conn.query(query, [classCode]);
+  return rows;
+};
 
 const getStudentsInitialData = async (conn, req) => {
-    const query = `
+  const query = `
       SELECT 
         s.student_id AS id,
         CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS fullName,
@@ -374,13 +426,13 @@ const getStudentsInitialData = async (conn, req) => {
       ORDER BY 
         s.student_id
       DESC;
-    `
+    `;
   const [rows] = await conn.query(query);
-  return rows
-}
+  return rows;
+};
 
 const getStudentGrades = async (conn, req) => {
-    const query = `
+  const query = `
       SELECT 
         sg.student_grades_id as id,
         sg.subject_code,
@@ -403,11 +455,15 @@ const getStudentGrades = async (conn, req) => {
       ORDER BY 
         sg.student_grades_id
       DESC
-    `
-  const [rows] = await conn.query(query, [req.query.student_id, req.query.year_level, req.query.semester, req.query.school_year]);
-  return rows
-}
-
+    `;
+  const [rows] = await conn.query(query, [
+    req.query.student_id,
+    req.query.year_level,
+    req.query.semester,
+    req.query.school_year,
+  ]);
+  return rows;
+};
 
 const getStudentYearSemesterAndSchoolYear = async (conn, req) => {
   const query = `
@@ -422,17 +478,17 @@ const getStudentYearSemesterAndSchoolYear = async (conn, req) => {
       sg.student_id = ?
     GROUP BY 
       sg.year_level, sg.semester, sg.school_year
-  `
-const [rows] = await conn.query(query, [req.query.student_id]);
-return rows
-}
+  `;
+  const [rows] = await conn.query(query, [req.query.student_id]);
+  return rows;
+};
 
 const getStudentsBySearch = async (conn, req) => {
-  const { searchParam } = req.body
-  const { accessLevel, college_code, program_code } = req.cookies
+  const { searchParam } = req.body;
+  const { accessLevel, college_code, program_code } = req.cookies;
   let query;
   let queryParams;
-  if(accessLevel === 'Administrator' || accessLevel === 'Registrar') {
+  if (accessLevel === "Administrator" || accessLevel === "Registrar") {
     query = `
     SELECT DISTINCT
         s.student_id AS id,
@@ -471,8 +527,13 @@ const getStudentsBySearch = async (conn, req) => {
       ORDER BY 
         s.student_id
       DESC;`;
-      queryParams = [`%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
-  } else if(accessLevel === 'Dean') {
+    queryParams = [
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+    ];
+  } else if (accessLevel === "Dean") {
     query = `
     SELECT DISTINCT
         s.student_id AS id,
@@ -516,9 +577,15 @@ const getStudentsBySearch = async (conn, req) => {
         )
       ORDER BY 
         s.student_id
-      DESC;`
-      queryParams = [college_code, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
-  } else if(accessLevel === 'Chairperson') {
+      DESC;`;
+    queryParams = [
+      college_code,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+    ];
+  } else if (accessLevel === "Chairperson") {
     query = `
     SELECT DISTINCT
         s.student_id AS id,
@@ -562,13 +629,19 @@ const getStudentsBySearch = async (conn, req) => {
         )
       ORDER BY 
         s.student_id
-      DESC;`
-      queryParams = [program_code, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`, `%${searchParam}%`];
+      DESC;`;
+    queryParams = [
+      program_code,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+      `%${searchParam}%`,
+    ];
   }
-  
+
   const [rows] = await conn.query(query, queryParams);
-  return rows.length > 0 ? rows : []
-}
+  return rows.length > 0 ? rows : [];
+};
 
 const getProgramCodesByCampus = async (conn) => {
   const [rows] = await conn.query(`SELECT 
@@ -578,9 +651,9 @@ const getProgramCodesByCampus = async (conn) => {
       curriculum 
     WHERE 
       curriculum_title 
-    LIKE "%New Curriculum%"`)
-  return rows.length > 0 ? rows : []
-}
+    LIKE "%New Curriculum%"`);
+  return rows.length > 0 ? rows : [];
+};
 
 const insertSubjectCodeForGraduateStudies = async (conn) => {
   const query = `INSERT INTO graduate_studies (subject_code) 
@@ -602,36 +675,36 @@ const insertSubjectCodeForGraduateStudies = async (conn) => {
       AND c.program_code NOT LIKE "BP%"
       AND c.program_code NOT LIKE "TCP%"
       AND c.program_code NOT LIKE "BIT%"  
-	  AND subject_code NOT IN(SELECT subject_code FROM graduate_studies)`
+	  AND subject_code NOT IN(SELECT subject_code FROM graduate_studies)`;
   const [rows] = await conn.query(query);
-  return rows.length > 0 ? rows : []
-}
+  return rows.length > 0 ? rows : [];
+};
 module.exports = {
-    getCurrentSchedule,
-    getEmails,
-    getEmailsPerCollegeCode,
-    getAllEmails,
-    getSubjectLoad,
-    getGradeTableService,
-    getGradeSubmissionLogs,
-    getAllNoAccounts,
-    updateClassCodeStatus,
-    updateMidtermClassStatusByClassCode,
-    insertMidtermClassCodeUpdateLog,
-    insertClassCodeUpdateLog,
-    getColleges,
-    checkNewCollege,
-    saveCollege,
-    getProgramCodes,
-    getSubjectCodes,
-    getDeadlineLogs,
-    saveSubjectCode,
-    getClassCodeDetails,
-    getClassStudents,
-    getStudentsInitialData,
-    getStudentGrades,
-    getStudentYearSemesterAndSchoolYear,
-    getStudentsBySearch,
-    getProgramCodesByCampus,
-    insertSubjectCodeForGraduateStudies
-}
+  getCurrentSchedule,
+  getEmails,
+  getEmailsPerCollegeCode,
+  getAllEmails,
+  getSubjectLoad,
+  getGradeTableService,
+  getGradeSubmissionLogs,
+  getAllNoAccounts,
+  updateClassCodeStatus,
+  updateMidtermClassStatusByClassCode,
+  insertMidtermClassCodeUpdateLog,
+  insertClassCodeUpdateLog,
+  getColleges,
+  checkNewCollege,
+  saveCollege,
+  getProgramCodes,
+  getSubjectCodes,
+  getDeadlineLogs,
+  saveSubjectCode,
+  getClassCodeDetails,
+  getClassStudents,
+  getStudentsInitialData,
+  getStudentGrades,
+  getStudentYearSemesterAndSchoolYear,
+  getStudentsBySearch,
+  getProgramCodesByCampus,
+  insertSubjectCodeForGraduateStudies,
+};

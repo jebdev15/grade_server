@@ -515,7 +515,10 @@ router.get("/getExcelFile", async (req, res) => {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   );
   res.setHeader("Content-Disposition", "attachment; filename=" + "File.xlsx");
-  workbook.xlsx.write(res).then(() => res.end());
+  workbook.xlsx.write(res).then(() => res.end()).catch((err) => {
+    console.error("Error writing Excel file:", err);
+    res.status(500).send("Error generating Excel file");
+  });
 });
 
 router.get("/getGSExcelFile", async (req, res) => {

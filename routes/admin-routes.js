@@ -47,7 +47,6 @@ router.get('/getCurrentSchedule', async (req, res) => {
 router.get('/getFacultyBySchoolYearAndSemester', FacultyController.getFacultyBySchoolYearAndSemester)
 router.get('/getEmails', async (req, res) => {
     const { college_code, accessLevel } = req.cookies;
-    console.log({college_code, accessLevel});
     const identifyAccessLevel = getEmailsAllowedAccessLevels(accessLevel);
     const conn = await startConnection(req);
     try {

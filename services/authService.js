@@ -1,6 +1,5 @@
 const AuthDAO = require("../dataAccess/authDAO");
 const AuthUtil = require("../utils/authUtil");
-const { NODE_ENV } = require("../utils/envVariables");
 
 const AuthService = {
     login: async (conn, req) => {
