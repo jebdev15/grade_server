@@ -7,7 +7,6 @@ const getCampus = (req) => {
   const referer = req.headers.referer || req.headers.referrer;
   const refererURL = new URL(referer);
   const refererOrigin = refererURL.origin;
-  console.log(`Referer: ${refererOrigin}`);
   let campusInfoValue;
   switch(refererOrigin) {
     case 'http://localhost:3000':

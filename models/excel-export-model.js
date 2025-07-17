@@ -58,6 +58,7 @@ const getGraduateStudiesGradesData = async (conn, { class_code, semester, curren
   );
   return rows;
 };
+
 module.exports = {
   getGradesData,
   getGraduateStudiesGradesData,

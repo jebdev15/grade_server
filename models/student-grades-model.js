@@ -24,10 +24,10 @@ const insertUpdateLog = async (conn, classCode, method, termType) => {
 };
 
 // Function to insert a grade log entry
-const insertGradeLog = async (conn, student_grades_id) => {
-  await conn.execute(
-    "INSERT INTO grade_logs (student_grades_id, status) VALUES (?, ?)",
-    [student_grades_id, "NP"]
+const insertGradeLog = async (conn, { student_grades_id, midterm_grade, endterm_grade, grade, remarks }, modified_eventkey) => {
+  await conn.query(
+    "INSERT INTO grade_logs (student_grades_id, mid_grade, end_grade, grade, remarks, modified_eventkey, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [student_grades_id, midterm_grade, endterm_grade, grade, remarks, modified_eventkey, "NP"]
   );
 };
 
@@ -40,13 +40,43 @@ const getSubjectCodeByClassCode = async (conn, class_code) => {
   return cls[0]?.subject_code;
 };
 
+// Function to fetch students with no credits
+const fetchStudentsWithNoCredits = async (conn, filter) => {
+  const [rows] = await conn.query(
+    `SELECT COUNT(*) as totalNoOfNoCredits FROM student_grades 
+     WHERE credit < 1 
+     AND (grade > 74 OR grade BETWEEN 1 AND 2)
+     AND school_year = ? 
+     AND semester = ?;`,
+    [filter.school_year, filter.semester]
+  );
+  return rows;
+};
+
+// Function to update credits for passed students
+const updateCreditsForPassedStudents = async (conn, filter) => {
+  const [rows] = await conn.query(
+    `UPDATE student_grades sg
+    JOIN subject s ON sg.subject_code = s.subject_code 
+    SET sg.credit = s.lec_units + s.lab_units, sg.remarks = 'passed'
+    WHERE
+      sg.credit < 1
+      AND (grade > 74 OR grade BETWEEN 1 AND 2)
+      AND sg.school_year = ? 
+      AND sg.semester = ?;`,
+    [filter.school_year, filter.semester]
+  );
+  console.log({ updateFunction: rows });
+  return rows;
+};
+
 // Function to get students with grades by class code
 const getUndergradGradesByClassCode = async (conn, classCode) => {
   const [rows] = await conn.query(
     `SELECT 
           sg.student_grades_id as sg_id, 
           s.student_id, 
-          CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as name, 
+          CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) as name, 
           FORMAT(sg.mid_grade,0) as mid_grade, 
           FORMAT(sg.final_grade,0) as final_grade, 
           sg.remarks as dbRemark
@@ -112,7 +142,7 @@ const updateGradeRow = async (conn, data) => {
     final_grade,
     grade,
     remarks,
-    hasCredits,
+    credits,
     modifiedEventKey,
     subjectCode,
   } = data;
@@ -124,7 +154,7 @@ const updateGradeRow = async (conn, data) => {
        sg.final_grade = ?, 
        sg.grade = ?, 
        sg.remarks = ?,
-       sg.credit = ${hasCredits},
+       sg.credit = ${credits},
        sg.modified_eventkey = ?
      WHERE sg.student_grades_id = ? 
      AND sg.subject_code = ?`,
@@ -138,7 +168,6 @@ const updateGradeRow = async (conn, data) => {
       subjectCode,
     ]
   );
-  if (result.affectedRows > 0) await insertGradeLog(conn, student_grades_id);
   return result;
 };
 
@@ -152,8 +181,7 @@ const fetchGraduateStudiesStudentGrades = async (conn, class_code) => {
         CASE WHEN sg.grade IS NULL THEN 0 ELSE sg.grade END AS grade, 
         CASE WHEN sg.mid_grade IS NULL THEN 0 ELSE sg.mid_grade END AS mid_grade,
         CASE WHEN sg.final_grade IS NULL THEN 0 ELSE sg.final_grade END AS end_grade,
-        sg.remarks AS dbRemark,
-        c.status
+        sg.remarks AS dbRemark
       FROM class c 
       INNER JOIN student_load sl ON sl.class_code = c.class_code
       INNER JOIN student s ON sl.student_id = s.student_id
@@ -172,8 +200,11 @@ const fetchGraduateStudiesStudentGrades = async (conn, class_code) => {
 
 module.exports = {
   insertUpdateLog, // Insert update log in modified_eventlog table
+  insertGradeLog, // Insert grade log in grade_logs table
   insertModifiedEventLog, // Insert modified event log in modified_eventlog table
   getSubjectCodeByClassCode,
+  fetchStudentsWithNoCredits, // Fetch students with no credits
+  updateCreditsForPassedStudents, // Update credits for passed students
   getUndergradGradesByClassCode, // Fetch undergraduate student(s) grade(s) in student_grades table
   updateGradeById, // Update undergraduate student(s) grade(s) in student_grades table
   fetchStudentGradeById, // Fetch undergraduate student grade by student_grades_id

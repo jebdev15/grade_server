@@ -4,13 +4,13 @@ const { startConnection, endConnection } = require("../config/conn");
 const model = require("../models/student-grades-model");
 const gradeFormatterUtil = require("../utils/grade-formatter-util");
 
-const updateGradeById = async (
-  conn,
-  data,
-  modifiedEventKey
-) => {
-  const result = await model.updateGradeById(conn, data, modifiedEventKey);
-  return result;
+const updateGradeById = async (conn, data, modifiedEventKey) => {
+  try {
+    const result = await model.updateGradeById(conn, data, modifiedEventKey);
+    return result;
+  } catch (error) {
+    throw new Error(error);
+  }
 };
 
 const updateEncodedRow = async (
@@ -19,23 +19,23 @@ const updateEncodedRow = async (
   modifiedEventKey,
   academic_level
 ) => {
-  try {
-    const processedData = gradeFormatterUtil.processedEncodedRow(
-      data,
-      academic_level
-    );
-    const result = await updateGradeById(
-      conn,
-      processedData,
-      modifiedEventKey
-    );
-    return result;
-  } catch (error) {
-    throw new Error(error.message);
-  }
+  const processedData = gradeFormatterUtil.processedEncodedRow(
+    data,
+    academic_level
+  );
+  const result = await updateGradeById(conn, processedData, modifiedEventKey);
+  if(result.affectedRows > 0) await model.insertGradeLog(conn, processedData, modifiedEventKey);
+  return result;
 };
 
-const processRow = async (row, subjectCode, modifiedEventKey, conn, i) => {
+const processRow = async (
+  row,
+  subjectCode,
+  modifiedEventKey,
+  conn,
+  i,
+  academic_level
+) => {
   const rowData = [
     row.values[1], // Student grade id
     gradeFormatterUtil.getVerifiedCellValue(row, 4), // Midterm grade
@@ -45,7 +45,6 @@ const processRow = async (row, subjectCode, modifiedEventKey, conn, i) => {
     gradeFormatterUtil.getVerifiedCellValueForRemark(row, 8), // Remark
     row.values[3], // Student name
   ];
-
   try {
     const processedRow = gradeFormatterUtil.processGradeRow(
       rowData,
@@ -73,6 +72,7 @@ const processRow = async (row, subjectCode, modifiedEventKey, conn, i) => {
       return { affectedRows: 0, changedRows: 0 };
     }
     const result = await model.updateGradeRow(conn, processedData);
+    if (result.affectedRows > 0) await model.insertGradeLog(conn, processedData, modifiedEventKey);
     return result;
   } catch (err) {
     throw new Error(
@@ -81,7 +81,24 @@ const processRow = async (row, subjectCode, modifiedEventKey, conn, i) => {
   }
 };
 
-// services for Admin-Faculty Undergraduate Studies
+// Function to fetch students with no credits
+const getStudentsWithNoCredits = async (req) => {
+  const conn = await startConnection(req);
+  try {
+    const rows = await model.fetchStudentsWithNoCredits(conn, req.params);
+    if(rows.length > 0) {
+      const updatedRows = await model.updateCreditsForPassedStudents(conn, req.params);
+      return { count: rows[0].totalNoOfNoCredits, updated: updatedRows.affectedRows };
+    }
+    return { count: rows.length > 0 ? rows[0].totalNoOfNoCredits : 0, updated: 0 };
+  } catch (err) {
+    throw err;
+  } finally {
+    await endConnection(conn);
+  }
+}
+
+// Function to fetch student(s) with grade(s)
 const getStudentsWithGradesByClassCode = async (req) => {
   const conn = await startConnection(req); // Start a new database connection
   const { academic_level } = req.params;
@@ -97,13 +114,13 @@ const getStudentsWithGradesByClassCode = async (req) => {
       req.params.class_code
     ); // Fetch undergraduate student(s) grade in student_grades table
   } catch (err) {
-    console.error("Error fetching undergraduate student grades:", err.message);
     throw err;
   } finally {
     await endConnection(conn); // Ensure the connection is closed after the operation
   }
 };
 
+// Function to update student grade
 const updateStudentGrades = async (req) => {
   const conn = await startConnection(req);
   await conn.beginTransaction(); // Start a transaction for the update operation
@@ -111,8 +128,7 @@ const updateStudentGrades = async (req) => {
     // Extract grades, class_code, and term_type from the request body
     const { grades, class_code, term_type } = req.body;
     const { academic_level } = req.params;
-    console.log({ academic_level });
-    const userName = req.cookies.name;
+    const userName = req.cookies.name || req.cookies.email || "";
     const modifiedEventKey = await model.insertModifiedEventLog(
       conn,
       "modified_eventlog",
@@ -143,7 +159,6 @@ const updateStudentGrades = async (req) => {
     await conn.commit(); // Commit the transaction if all updates are successful
     return totalAffectedRows; // Return the total number of affected rows
   } catch (err) {
-    console.error("Error updating grades:", err.message);
     await conn.rollback(); // Rollback the transaction in case of error
     throw err; // Propagate error so the controller can handle the response
   } finally {
@@ -153,6 +168,7 @@ const updateStudentGrades = async (req) => {
 
 const uploadGradeSheet = async (req) => {
   const { class_code, method, term_type } = req.body;
+  const { academic_level } = req.params;
   const file = req.file;
   if (!file) throw new Error("No file uploaded");
 
@@ -168,7 +184,7 @@ const uploadGradeSheet = async (req) => {
   }
 
   const conn = await startConnection(req);
-  const userName = req.cookies.name || "Unknown User";
+  const userName = req.cookies.name || req.cookies.email || "";
 
   try {
     const subjectCode = await model.getSubjectCodeByClassCode(conn, class_code);
@@ -192,7 +208,7 @@ const uploadGradeSheet = async (req) => {
       // Skip empty rows (optional)
       if (!row.values[1]) continue;
       rowPromises.push(
-        processRow(row, subjectCode, modifiedEventKey, conn, i, "undergraduate")
+        processRow(row, subjectCode, modifiedEventKey, conn, i, academic_level)
       );
     }
     await Promise.all(rowPromises);
@@ -212,6 +228,7 @@ const uploadGradeSheet = async (req) => {
 };
 
 module.exports = {
+  getStudentsWithNoCredits, // Fetch students with no credits
   getStudentsWithGradesByClassCode, // Fetch undergraduate student(s) grade by class code
   updateStudentGrades, // Update undergraduate student grade
   uploadGradeSheet, // Upload grade sheet for undergraduate studies

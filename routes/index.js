@@ -8,6 +8,7 @@ const setupRoutes = (app) => {
   app.use("/admin-student", require("./student-grades-routes"));
   app.use("/download", require("./download-routes"));
   app.use("/excel-export", require("./excel-export-routes"));
+  app.use("/admin-report", require("./generate-report-routes"));
 };
 
 module.exports = setupRoutes;

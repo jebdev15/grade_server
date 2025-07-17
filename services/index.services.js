@@ -281,8 +281,8 @@ const indexUpdateGrade = async (conn, grade, modifiedEventKey) => {
   );  
   if(rows.affectedRows > 0) {
     await conn.execute(
-      "INSERT INTO grade_logs (student_grades_id, status) VALUES(?, ?)",
-      [sg_id, "NP"]
+      "INSERT INTO grade_logs (student_grades_id, modified_eventkey, status) VALUES(?, ?, ?)",
+      [sg_id, modifiedEventKey, "NP"]
     );
   }
   return rows;
@@ -321,8 +321,8 @@ const indexUpdateGraduateStudiesGrade = async (conn, gradeData, modifiedEventKey
   );
   if(rows.affectedRows > 0) {
     await conn.execute(
-      "INSERT INTO grade_logs (student_grades_id, status) VALUES(?, ?)",
-      [sg_id, "NP"]
+      "INSERT INTO grade_logs (student_grades_id, modified_eventkey, status) VALUES(?, ?, ?)",
+      [sg_id, modifiedEventKey, "NP"]
     );
   }
   return rows;
