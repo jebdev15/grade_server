@@ -128,7 +128,7 @@ const getUploadGrade = (data, academic_level) => {
 };
 
 const getCredits = (grade, finalRemark, academic_level) => {
-  if(academic_level === "undergraduate") {
+  if (academic_level === "undergraduate") {
     const isRemarkPassed = grade > 74 || finalRemark === "passed";
     const hasCredits = isRemarkPassed ? "subj.lec_units + subj.lab_units" : "0";
     return { hasCredits };
@@ -151,7 +151,8 @@ const getRemark = function (data, grade, academic_level) {
   if (academic_level === "undergraduate") {
     if (grade > 74 || status === "passed") return { finalRemark: "passed" };
   }
-  if ((grade >= 1 && grade <= 2) || status === "passed") return { finalRemark: "passed" };
+  if ((grade >= 1 && grade <= 2) || status === "passed")
+    return { finalRemark: "passed" };
   if (arrayOfRemarks.includes(remark)) {
     let remarks = "";
     switch (remark) {
@@ -187,48 +188,46 @@ const processedEncodedRow = (data, academic_level) => {
 
 // This function processes the encoded undergraduate row
 const processEncodedUndergradRow = (data) => {
-  let { sg_id, mid_grade, final_grade, dbRemark, status } = data;
+  const { sg_id, mid_grade, final_grade, dbRemark, status } = data;
   // Handle isNaN for mid_grade and final_grade
-  mid_grade = isNaNOrNullOrEmpty(mid_grade) ? 0 : mid_grade;
-  final_grade = isNaNOrNullOrEmpty(final_grade) ? 0 : final_grade;
-  const parsedMidGrade = parseInt(mid_grade);
-  const parsedFinalGrade = parseInt(final_grade);
+  const midGrade = isNaNOrNullOrEmpty(mid_grade) ? 0 : mid_grade;
+  const finalGrade = isNaNOrNullOrEmpty(final_grade) ? 0 : final_grade;
+  const parsedMidGrade = parseInt(midGrade);
+  const parsedFinalGrade = parseInt(finalGrade);
   const checkGrades = parsedMidGrade > 0 && parsedFinalGrade > 0;
   const average = checkGrades
     ? Math.round((parsedMidGrade + parsedFinalGrade) / 2)
     : 0;
-  const hasCredits = average > 74 ? "subj.lec_units + subj.lab_units" : "0";
+  const hasCredits = average > 74;
   const remarks =
     status === "passed" || status === "failed" ? status : dbRemark;
   return {
     student_grades_id: sg_id,
-    midterm_grade: mid_grade,
-    endterm_grade: final_grade,
+    mid_grade: parsedMidGrade,
+    final_grade: parsedFinalGrade,
     grade: average,
     remarks,
-    credits: hasCredits,
+    hasCredits,
   };
 };
 
 // This function processes the encoded graduate row
 const processEncodedGraduateRow = (data) => {
-  const { sg_id, mid_grade, end_grade, grade, status, dbRemark } = data;
+  const { sg_id, mid_grade, final_grade, grade, status, dbRemark } = data;
   // Handle isNaN for mid_grade and final_grade
   const filteredMidGrade = isNaNOrNullOrEmpty(mid_grade) ? 0 : mid_grade;
-  const filteredEndGrade = isNaNOrNullOrEmpty(end_grade) ? 0 : end_grade;
+  const filteredFinalGrade = isNaNOrNullOrEmpty(final_grade) ? 0 : final_grade;
   const parsedMidGrade = parseFloat(filteredMidGrade);
-  const parsedFinalGrade = parseFloat(filteredEndGrade);
-  const hasCredits =
-    grade >= 1 && grade <= 2 ? "subj.lec_units + subj.lab_units" : "0";
-  const remarks =
-    status === "passed" || status === "failed" ? status : dbRemark;
+  const parsedFinalGrade = parseFloat(filteredFinalGrade);
+  const hasCredits = grade >= 1 && grade <= 2;
+  const remarks = status === "passed" || status === "failed" ? status : dbRemark;
   return {
     student_grades_id: sg_id,
-    midterm_grade: parsedMidGrade,
-    endterm_grade: parsedFinalGrade,
+    mid_grade: parsedMidGrade,
+    final_grade: parsedFinalGrade,
     grade,
     remarks,
-    credits: hasCredits,
+    hasCredits,
   };
 };
 

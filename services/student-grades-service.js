@@ -3,7 +3,73 @@ const fs = require("fs").promises;
 const { startConnection, endConnection } = require("../config/conn");
 const model = require("../models/student-grades-model");
 const gradeFormatterUtil = require("../utils/grade-formatter-util");
+const { urlDecode } = require("url-encode-base64");
 
+// Faculty - Student Grades
+const updateStudentGrade = async (req) => {
+  const { grades, class_code, method, term_type } = req.body;
+  const ipAddress = req.ip;
+  const conn = await startConnection(req);
+  console.log({academic_level: req.params.academic_level})
+  try {
+    await conn.beginTransaction();
+    const decodeClassCode = urlDecode(class_code);
+
+    let totalAffectedRows = 0;
+    const userName = await model.eventkeyUserEmailRef(conn, req.cookies.email);
+    const subjectCode = await model.getSubjectCodeByClassCode(conn, decodeClassCode);
+    const subjectCredit = await model.getCredits(conn, subjectCode);
+
+    for (const grade of grades) {
+      const processedGradeData = gradeFormatterUtil.processedEncodedRow(grade, req.params.academic_level);
+      const credit = processedGradeData.hasCredits ? subjectCredit : 0;
+
+      const modifiedEventKey = await model.insertModifiedEventLog(
+        conn,
+        "modified_eventlog",
+        "student_grades",
+        userName,
+        "Registrar",
+        ipAddress
+      );
+
+      const { hasCredits, ...filteredData } = processedGradeData;
+      const data = { ...filteredData, credit, modifiedEventKey }
+      try {
+        const result = await model.updateStudentGrade(
+          conn,
+          { ...filteredData, credit, modifiedEventKey }
+        );
+  
+        if (result.affectedRows > 0) {
+          try {
+            await model.insertGradeLog(conn, data, modifiedEventKey);
+          } catch (error) {
+            throw new Error(error);
+          }
+        }
+        totalAffectedRows += result.affectedRows || 0;
+      } catch (error) {
+        throw new Error(error);
+      }
+    }
+    try {
+      await model.insertUpdateLog(conn, decodeClassCode, method, term_type);
+    } catch (error) {
+      throw new Error(error);
+    }
+    await conn.commit();
+
+    return { totalAffectedRows, changedRows: totalAffectedRows };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    await endConnection(conn);
+  }
+};
+
+// Admin - Faculty - Student Grades
 const updateGradeById = async (conn, data, modifiedEventKey) => {
   try {
     const result = await model.updateGradeById(conn, data, modifiedEventKey);
@@ -24,7 +90,8 @@ const updateEncodedRow = async (
     academic_level
   );
   const result = await updateGradeById(conn, processedData, modifiedEventKey);
-  if(result.affectedRows > 0) await model.insertGradeLog(conn, processedData, modifiedEventKey);
+  if (result.affectedRows > 0)
+    await model.insertGradeLog(conn, processedData, modifiedEventKey);
   return result;
 };
 
@@ -72,7 +139,8 @@ const processRow = async (
       return { affectedRows: 0, changedRows: 0 };
     }
     const result = await model.updateGradeRow(conn, processedData);
-    if (result.affectedRows > 0) await model.insertGradeLog(conn, processedData, modifiedEventKey);
+    if (result.affectedRows > 0)
+      await model.insertGradeLog(conn, processedData, modifiedEventKey);
     return result;
   } catch (err) {
     throw new Error(
@@ -86,17 +154,26 @@ const getStudentsWithNoCredits = async (req) => {
   const conn = await startConnection(req);
   try {
     const rows = await model.fetchStudentsWithNoCredits(conn, req.params);
-    if(rows.length > 0) {
-      const updatedRows = await model.updateCreditsForPassedStudents(conn, req.params);
-      return { count: rows[0].totalNoOfNoCredits, updated: updatedRows.affectedRows };
+    if (rows.length > 0) {
+      const updatedRows = await model.updateCreditsForPassedStudents(
+        conn,
+        req.params
+      );
+      return {
+        count: rows[0].totalNoOfNoCredits,
+        updated: updatedRows.affectedRows,
+      };
     }
-    return { count: rows.length > 0 ? rows[0].totalNoOfNoCredits : 0, updated: 0 };
+    return {
+      count: rows.length > 0 ? rows[0].totalNoOfNoCredits : 0,
+      updated: 0,
+    };
   } catch (err) {
     throw err;
   } finally {
     await endConnection(conn);
   }
-}
+};
 
 // Function to fetch student(s) with grade(s)
 const getStudentsWithGradesByClassCode = async (req) => {
@@ -228,6 +305,7 @@ const uploadGradeSheet = async (req) => {
 };
 
 module.exports = {
+  updateStudentGrade, // Update student grade. This function is used by the faculty
   getStudentsWithNoCredits, // Fetch students with no credits
   getStudentsWithGradesByClassCode, // Fetch undergraduate student(s) grade by class code
   updateStudentGrades, // Update undergraduate student grade
