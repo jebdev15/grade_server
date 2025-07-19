@@ -99,9 +99,9 @@ const getGraduateStudiesTable = async (conn, decode) => {
           CONCAT(s.student_lastname, ', ', s.student_firstname, ' ',s.student_middlename) as name, 
           CASE WHEN sg.grade IS NULL THEN 0 ELSE sg.grade END as grade, 
           CASE WHEN sg.mid_grade IS NULL THEN 0 ELSE sg.mid_grade END as mid_grade,
-          CASE WHEN sg.final_grade IS NULL THEN 0 ELSE sg.final_grade END as end_grade,
+          CASE WHEN sg.final_grade IS NULL THEN 0 ELSE sg.final_grade END as final_grade,
           sg.remarks as dbRemark,
-          c.status
+          
         FROM class c 
         INNER JOIN student_load sl
           USING (class_code) 
