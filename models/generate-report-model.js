@@ -86,19 +86,19 @@ const fetchStudentGradeUpdateLog = async (conn, schoolYear, semester) => {
       CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname), ' ', TRIM(s.student_middlename)) AS student_name,
       s.student_id,
       sg.subject_code,
-      gl.mid_grade,
-      gl.end_grade,
-      gl.grade,
-      gl.remarks,
-      gl.credit,
+      CAST(sgl.mid_grade AS DECIMAL(5,2)) AS mid_grade,
+      CAST(sgl.final_grade AS DECIMAL(5,2)) AS final_grade,
+      CAST(sgl.grade AS DECIMAL(5,2)) AS grade,
+      sgl.remarks,
+      CASE WHEN sgl.credit IS NULL THEN 0 ELSE CAST(sgl.credit AS DECIMAL(5,1)) END AS credit,
       mel.user AS updated_by,
       mel.datetimestamp AS updated_at
-    FROM grade_logs gl
-    INNER JOIN student_grades sg ON gl.student_grades_id = sg.student_grades_id
+    FROM student_grades_log sgl
+    INNER JOIN student_grades sg ON sgl.student_grades_id = sg.student_grades_id
     INNER JOIN student s ON sg.student_id = s.student_id
-    INNER JOIN modified_eventlog mel ON gl.modified_eventkey = mel.modified_eventkey
-    WHERE sg.school_year = ? AND sg.semester = ?
-    ORDER BY student_name
+    INNER JOIN modified_eventlog mel ON sgl.modified_eventkey = mel.modified_eventkey
+    WHERE sg.school_year = ? AND sg.semester = ? AND sgl.action_type = 'UPDATE'
+    ORDER BY updated_at DESC
   `;
 
   const [rows] = await conn.query(query, [schoolYear, semester]);

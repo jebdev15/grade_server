@@ -6,11 +6,31 @@ const gradeFormatterUtil = require("../utils/grade-formatter-util");
 const { urlDecode } = require("url-encode-base64");
 
 // Faculty - Student Grades
+const getStudents = async (req) => {
+  const { academic_level, class_code, semester, school_year } = req.params;
+  const decode = {
+    class_code: urlDecode(class_code),
+    semester: urlDecode(semester),
+    school_year: urlDecode(school_year)
+  };
+
+  const conn = await startConnection(req);
+  try {
+    if (academic_level === "undergraduate") return await model.fetchUndergradStudents(conn, decode);
+    return await model.fetchGraduateStudiesStudents(conn, decode);
+  } catch (err) {
+    throw err;
+  } finally {
+    await endConnection(conn);
+  }
+}
+
+// Faculty - Update Student Grades
 const updateStudentGrade = async (req) => {
   const { grades, class_code, method, term_type } = req.body;
   const ipAddress = req.ip;
   const conn = await startConnection(req);
-  console.log({academic_level: req.params.academic_level})
+  console.log({ academic_level: req.params.academic_level })
   try {
     await conn.beginTransaction();
     const decodeClassCode = urlDecode(class_code);
@@ -38,16 +58,9 @@ const updateStudentGrade = async (req) => {
       try {
         const result = await model.updateStudentGrade(
           conn,
-          { ...filteredData, credit, modifiedEventKey }
+          data
         );
-  
-        if (result.affectedRows > 0) {
-          try {
-            await model.insertGradeLog(conn, data, modifiedEventKey);
-          } catch (error) {
-            throw new Error(error);
-          }
-        }
+
         totalAffectedRows += result.affectedRows || 0;
       } catch (error) {
         throw new Error(error);
@@ -69,10 +82,92 @@ const updateStudentGrade = async (req) => {
   }
 };
 
-// Admin - Faculty - Student Grades
-const updateGradeById = async (conn, data, modifiedEventKey) => {
+// Faculty - Process
+// Faculty - Upload Grade Sheet
+const uploadExcel = async (req) => {
+  const uploadFile = req.file;
+  const { method, term_type } = req.body;
+  const class_code = urlDecode(req.body.class_code);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(uploadFile.path);
+
+  const sheet = workbook.worksheets[0];
+  if (sheet.name !== class_code) {
+    await fs.unlink(uploadFile.path);
+    throw new Error("Please upload the correct file.");
+  }
+
+  const conn = await startConnection(req);
+  const userName = await model.eventkeyUserEmailRef(conn, req.cookies.email);
   try {
-    const result = await model.updateGradeById(conn, data, modifiedEventKey);
+    await conn.beginTransaction();
+
+    const modifiedEventKey = await model.insertModifiedEventLog(
+      conn,
+      'modified_eventlog',
+      'student_grades',
+      userName,
+      'Registrar',
+      req.ip
+    );
+    let totalAffectedRows = 0;
+    let totalChangedRows = 0;
+    const subjectCode = await model.getSubjectCodeByClassCode(conn, class_code);
+    if (!subjectCode) throw new Error("Subject code not found");
+    const subjectCredit = await model.getCredits(conn, subjectCode);
+    console.log({ sheetRowCount: sheet.rowCount})
+    for (let i = 14; i <= sheet.rowCount; i++) {
+      const row = sheet.getRow(i);
+      const rowData = gradeFormatterUtil.extractRowData(row);
+      if(!rowData[0]) continue;
+      const processedUploadRow = gradeFormatterUtil.processGradeRow(rowData, req.params.academic_level);
+      try {
+        const { hasCredits, ...filteredData } = processedUploadRow;
+        const credit = hasCredits ? subjectCredit : 0;
+        const data = { ...filteredData, credit, modified_eventkey: modifiedEventKey, subject_code: subjectCode };
+        const currentData = await model.getCurrentStudentGrade(conn, data.student_grades_id);
+        const noChanges = gradeFormatterUtil.compareStudentGradeData(currentData[0], data);
+        if (noChanges) continue;
+
+        const result = await model.updateGradeRow(conn, data);
+        console.log(`rowIndex: ${i}`, {
+          currentData: currentData[0],
+          processedRow: data,
+          noChanges,
+          affectedRows: result.affectedRows,
+          changedRows: result.changedRows,
+          result
+        });
+        totalAffectedRows += result.affectedRows || 0;
+        totalChangedRows += result.changedRows || 0;
+      } catch (err) {
+        throw new Error(
+          `Error processing row ${i}: ${err.message}. Please check the data format.`
+        );
+      }
+    }
+    console.log({ totalAffectedRows, totalChangedRows });
+    await model.insertUpdateLog(conn, class_code, method, term_type);
+    if (totalAffectedRows === 0) {
+      await conn.rollback();
+      throw new Error("No changes made.");
+    }
+    await conn.commit();
+
+    return { totalAffectedRows, totalChangedRows };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    await endConnection(conn);
+    await fs.unlink(uploadFile.path);
+  }
+};
+
+// Admin - Faculty - Student Grades
+const updateGradeById = async (conn, data) => {
+  try {
+    const result = await model.updateGradeById(conn, data);
     return result;
   } catch (error) {
     throw new Error(error);
@@ -82,16 +177,16 @@ const updateGradeById = async (conn, data, modifiedEventKey) => {
 const updateEncodedRow = async (
   conn,
   data,
-  modifiedEventKey,
+  modified_eventkey,
+  credit,
   academic_level
 ) => {
   const processedData = gradeFormatterUtil.processedEncodedRow(
     data,
     academic_level
   );
-  const result = await updateGradeById(conn, processedData, modifiedEventKey);
-  if (result.affectedRows > 0)
-    await model.insertGradeLog(conn, processedData, modifiedEventKey);
+  const { hasCredits, ...filteredData } = processedData;
+  const result = await updateGradeById(conn, {...filteredData, credit: hasCredits ? credit : 0, modified_eventkey });
   return result;
 };
 
@@ -129,18 +224,14 @@ const processRow = async (
     );
 
     // If the current grade matches the new grade, do not update
-    if (
-      currentGrade.length > 0 &&
-      currentGrade[0].mid_grade === processedData.mid_grade &&
-      currentGrade[0].final_grade === processedData.final_grade &&
-      currentGrade[0].grade === processedData.grade &&
-      currentGrade[0].remarks === processedData.remarks
-    ) {
+    const hasChanges = gradeFormatterUtil.compareStudentGradeData(
+      currentGrade,
+      processedData
+    )
+    if (!hasChanges) {
       return { affectedRows: 0, changedRows: 0 };
     }
     const result = await model.updateGradeRow(conn, processedData);
-    if (result.affectedRows > 0)
-      await model.insertGradeLog(conn, processedData, modifiedEventKey);
     return result;
   } catch (err) {
     throw new Error(
@@ -214,13 +305,18 @@ const updateStudentGrades = async (req) => {
       "Registrar",
       req.ip
     ); // Insert modified event log in modified_eventlog table
-
+    const subjectCode = await model.getSubjectCodeByClassCode(
+      conn,
+      class_code
+    )
+    const subjectCredit = await model.getCredits(conn, subjectCode);
     const affectedRowsArr = await Promise.all(
       grades.map(async (grade) => {
         const result = await updateEncodedRow(
           conn,
           grade,
           modifiedEventKey,
+          subjectCredit,
           academic_level
         );
         return result.affectedRows;
@@ -233,6 +329,10 @@ const updateStudentGrades = async (req) => {
     );
 
     await model.insertUpdateLog(conn, class_code, "Manual", term_type); // Insert update log in updates table
+    if(totalAffectedRows < 1) {
+      await conn.rollback();
+      throw new Error("No rows were updated");
+    }
     await conn.commit(); // Commit the transaction if all updates are successful
     return totalAffectedRows; // Return the total number of affected rows
   } catch (err) {
@@ -265,7 +365,7 @@ const uploadGradeSheet = async (req) => {
 
   try {
     const subjectCode = await model.getSubjectCodeByClassCode(conn, class_code);
-    if (!subjectCode) throw new Error("Class not found");
+    if (!subjectCode) throw new Error("Subject code not found");
 
     await conn.beginTransaction();
 
@@ -305,7 +405,9 @@ const uploadGradeSheet = async (req) => {
 };
 
 module.exports = {
+  getStudents, // Fetch student with grades. This function is used by the faculty
   updateStudentGrade, // Update student grade. This function is used by the faculty
+  uploadExcel, // Upload grade sheet. This function is used by the faculty
   getStudentsWithNoCredits, // Fetch students with no credits
   getStudentsWithGradesByClassCode, // Fetch undergraduate student(s) grade by class code
   updateStudentGrades, // Update undergraduate student grade

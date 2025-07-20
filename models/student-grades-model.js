@@ -23,13 +23,13 @@ const insertUpdateLog = async (conn, classCode, method, termType) => {
   );
 };
 
-// Function to insert a grade log entry
-const insertGradeLog = async (conn, { student_grades_id, mid_grade, final_grade, grade, remarks, credit }, modified_eventkey) => {
-  await conn.query(
-    "INSERT INTO grade_logs (student_grades_id, mid_grade, end_grade, grade, remarks, credit, modified_eventkey, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    [student_grades_id, mid_grade, final_grade, grade, remarks, credit, modified_eventkey, "NP"]
+const getCurrentStudentGrade = async (conn, student_grades_id) => {
+  const [rows] = await conn.query(
+    "SELECT * FROM student_grades WHERE student_grades_id = ?",
+    [student_grades_id]
   );
-};
+  return rows
+}
 
 // fetch credits
 const getCredits = async (conn, subject_code) => {
@@ -42,8 +42,8 @@ const getCredits = async (conn, subject_code) => {
 
 // Function to get user full name from faculty table using faculty_id as a reference from emails table
 const eventkeyUserEmailRef = async (conn, email_used) => {
-    const [userName] = await conn.query(
-        `SELECT 
+  const [userName] = await conn.query(
+    `SELECT 
           CONCAT(f.firstname, " ",f.lastname) as name 
         FROM 
           faculty f
@@ -51,12 +51,76 @@ const eventkeyUserEmailRef = async (conn, email_used) => {
           emails e 
         USING(faculty_id)
         WHERE e.email = ?`,
-        [email_used]
-    );
-    return userName[0].name
+    [email_used]
+  );
+  return userName[0].name
 }
 
 // Functions used by the Faculty
+
+const fetchUndergradStudents = async (conn, { class_code, school_year, semester }) => {
+  const [rows] = await conn.query(
+    `SELECT 
+          sg.student_grades_id as sg_id, 
+          s.student_id, 
+          CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as name, 
+          CASE 
+            WHEN sg.mid_grade = 0 THEN '' 
+            WHEN sg.mid_grade BETWEEN 1 AND 5 THEN FORMAT(sg.mid_grade,2) 
+            ELSE FORMAT(sg.mid_grade,0) 
+          END as mid_grade, 
+          CASE 
+            WHEN sg.final_grade = 0 THEN ''
+            WHEN sg.final_grade BETWEEN 1 AND 5 THEN FORMAT(sg.final_grade,2) 
+            ELSE FORMAT(sg.final_grade,0) 
+          END as final_grade, 
+          sg.remarks as dbRemark,
+          c.status
+        FROM class c 
+        INNER JOIN student_load sl
+          USING (class_code) 
+        INNER JOIN student s 
+          USING (student_id)
+        INNER JOIN student_grades sg
+          USING (student_id)
+        WHERE 
+          c.class_code = ? AND 
+          sg.subject_code = c.subject_code AND
+          sg.school_year = ? AND 
+          sg.semester = ?
+        GROUP BY name
+        ORDER BY name`,
+    [class_code, school_year, semester]
+  );
+  return rows;
+}
+// Function to fetch students
+const fetchGraduateStudiesStudents = async (conn, { class_code, school_year, semester }) => {
+  const [rows] = await conn.query(
+    `SELECT 
+      sg.student_grades_id AS sg_id, 
+      s.student_id, 
+      CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS name, 
+      CASE WHEN sg.grade IS NULL THEN 0 ELSE sg.grade END AS grade, 
+      CASE WHEN sg.mid_grade IS NULL THEN 0 ELSE sg.mid_grade END AS mid_grade,
+      CASE WHEN sg.final_grade IS NULL THEN 0 ELSE sg.final_grade END AS final_grade,
+      sg.remarks AS dbRemark
+    FROM class c 
+    INNER JOIN student_load sl ON sl.class_code = c.class_code
+    INNER JOIN student s ON s.student_id = sl.student_id
+    INNER JOIN student_grades sg ON sg.student_id = s.student_id AND sg.subject_code = c.subject_code
+    WHERE 
+      c.class_code = ? AND
+      sg.school_year = ? AND 
+      sg.semester = ?
+    ORDER BY name`,
+    [class_code, school_year, semester]
+  );
+
+  return rows;
+};
+
+// Function to update student grade
 const updateStudentGrade = async (conn, grade) => {
   // Replace with your actual query logic
   const query = `
@@ -153,7 +217,7 @@ const getUndergradGradesByClassCode = async (conn, classCode) => {
 };
 
 // Function to update student grades by ID
-const updateGradeById = async (conn, grade, modifiedEventKey) => {
+const updateGradeById = async (conn, grade) => {
   const [result] = await conn.query(
     `UPDATE 
         student_grades AS sg JOIN ${`subject`} AS subj ON sg.subject_code = ${`subj`}.subject_code
@@ -162,7 +226,7 @@ const updateGradeById = async (conn, grade, modifiedEventKey) => {
         sg.final_grade = ?, 
         sg.grade = ?, 
         sg.remarks = ?, 
-        sg.credit = ${grade.credits}, 
+        sg.credit = ?, 
         sg.modified_eventkey = ? 
       WHERE 
         student_grades_id = ?`,
@@ -171,7 +235,8 @@ const updateGradeById = async (conn, grade, modifiedEventKey) => {
       grade.final_grade,
       grade.grade,
       grade.remarks,
-      modifiedEventKey,
+      grade.credit,
+      grade.modified_eventkey,
       grade.student_grades_id,
     ]
   );
@@ -198,10 +263,20 @@ const updateGradeRow = async (conn, data) => {
     final_grade,
     grade,
     remarks,
-    credits,
-    modifiedEventKey,
-    subjectCode,
+    credit,
+    modified_eventkey,
+    subject_code,
   } = data;
+  console.log({
+    student_grades_id,
+    mid_grade,
+    final_grade,
+    grade,
+    remarks,
+    credit,
+    modified_eventkey,
+    subject_code,
+  })
   const [result] = await conn.query(
     `UPDATE student_grades AS sg
      JOIN subject AS subj ON sg.subject_code = subj.subject_code
@@ -210,7 +285,7 @@ const updateGradeRow = async (conn, data) => {
        sg.final_grade = ?, 
        sg.grade = ?, 
        sg.remarks = ?,
-       sg.credit = ${credits},
+       sg.credit = ?,
        sg.modified_eventkey = ?
      WHERE sg.student_grades_id = ? 
      AND sg.subject_code = ?`,
@@ -219,9 +294,10 @@ const updateGradeRow = async (conn, data) => {
       final_grade,
       grade,
       remarks,
-      modifiedEventKey,
+      credit,
+      modified_eventkey,
       student_grades_id,
-      subjectCode,
+      subject_code,
     ]
   );
   return result;
@@ -253,13 +329,14 @@ const fetchGraduateStudiesStudentGrades = async (conn, class_code) => {
   );
   return rows;
 };
-
 module.exports = {
   insertUpdateLog, // Insert update log in modified_eventlog table
-  insertGradeLog, // Insert grade log in grade_logs table
   insertModifiedEventLog, // Insert modified event log in modified_eventlog table
+  getCurrentStudentGrade, // Get current student grade
   getCredits, // Get credits
   eventkeyUserEmailRef, // Get user full name using email
+  fetchUndergradStudents, // Fetch undergraduate students
+  fetchGraduateStudiesStudents, // Fetch students with grades. This function is used by the faculty
   updateStudentGrade, // Update student grade. This function is used by the faculty
   getSubjectCodeByClassCode, // Get subject code by class code
   fetchStudentsWithNoCredits, // Fetch students with no credits

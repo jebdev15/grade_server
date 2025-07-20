@@ -1,4 +1,9 @@
 const { isNaNOrNullOrEmpty } = require("./value-formatter-util");
+const isEmpty = (str) => (!str?.length);
+const normalizeValue = (value) => {
+  if (value === null || value === undefined) return '';
+  return typeof value === 'string' ? value.trim() : value;
+};
 
 const getVerifiedCellValue = (row, index) => {
   const cell = row.getCell(index);
@@ -127,32 +132,28 @@ const getUploadGrade = (data, academic_level) => {
   };
 };
 
-const getCredits = (grade, finalRemark, academic_level) => {
+const getCredits = (grade, academic_level) => {
   if (academic_level === "undergraduate") {
-    const isRemarkPassed = grade > 74 || finalRemark === "passed";
-    const hasCredits = isRemarkPassed ? "subj.lec_units + subj.lab_units" : "0";
+    const hasCredits = grade > 74;
     return { hasCredits };
   }
-  const isRemarkPassed = (grade >= 1 && grade <= 2) || finalRemark === "passed";
-  const hasCredits = isRemarkPassed ? "subj.lec_units + subj.lab_units" : "0";
+  const hasCredits = (grade >= 1 && grade <= 2);
   return { hasCredits };
 };
 
-const getRemark = function (data, grade, academic_level) {
-  const status = data.status?.toLowerCase();
-  const remark = data.remark;
-  const arrayOfRemarks = [
-    "Incomplete",
-    "Dropped",
-    "No Attendance",
-    "No Grade",
-    "Withdrawn",
-  ];
+const getRemark = (data, grade, academic_level) => {
+  const status = data.status?.toLowerCase() || '';
+  const remark = data.remark?.trim();
+  const arrayOfRemarks = ["Incomplete", "Dropped", "No Attendance", "No Grade", "Withdrawn"];
+
   if (academic_level === "undergraduate") {
     if (grade > 74 || status === "passed") return { finalRemark: "passed" };
+  } else {
+    if ((grade >= 1 && grade <= 2) || status === "passed") {
+      return { finalRemark: "passed" };
+    }
   }
-  if ((grade >= 1 && grade <= 2) || status === "passed")
-    return { finalRemark: "passed" };
+
   if (arrayOfRemarks.includes(remark)) {
     let remarks = "";
     switch (remark) {
@@ -164,6 +165,7 @@ const getRemark = function (data, grade, academic_level) {
         break;
       case "No Attendance":
         remarks = "na";
+        break; // <-- You missed this
       case "No Grade":
         remarks = "ng";
         break;
@@ -175,8 +177,10 @@ const getRemark = function (data, grade, academic_level) {
     }
     return { finalRemark: remarks };
   }
-  return { finalRemark: status };
+
+  return { finalRemark: status || "failed" }; // Default to "failed" if undefined
 };
+
 
 // This function processes the encoded grade row
 const processedEncodedRow = (data, academic_level) => {
@@ -199,8 +203,7 @@ const processEncodedUndergradRow = (data) => {
     ? Math.round((parsedMidGrade + parsedFinalGrade) / 2)
     : 0;
   const hasCredits = average > 74;
-  const remarks =
-    status === "passed" || status === "failed" ? status : dbRemark;
+  const remarks = (average > 74) ? "passed" : isEmpty(dbRemark) ? status : dbRemark;
   return {
     student_grades_id: sg_id,
     mid_grade: parsedMidGrade,
@@ -220,7 +223,13 @@ const processEncodedGraduateRow = (data) => {
   const parsedMidGrade = parseFloat(filteredMidGrade);
   const parsedFinalGrade = parseFloat(filteredFinalGrade);
   const hasCredits = grade >= 1 && grade <= 2;
-  const remarks = status === "passed" || status === "failed" ? status : dbRemark;
+  const remarks = (grade >= 1 && grade <= 2)
+    ? "passed"
+    : isEmpty(dbRemark)
+      ? isEmpty(status)
+        ? ""
+        : status.toLowerCase()
+      : dbRemark;
   return {
     student_grades_id: sg_id,
     mid_grade: parsedMidGrade,
@@ -238,16 +247,37 @@ const processGradeRow = (gradeData, academic_level) => {
     academic_level
   );
   const { finalRemark } = getRemark(gradeData, grade, academic_level);
-  const { hasCredits } = getCredits(grade, finalRemark, academic_level);
+  const { hasCredits } = getCredits(grade, academic_level);
   return {
     student_grades_id,
     mid_grade,
     final_grade,
     grade,
     remarks: finalRemark,
-    credits: hasCredits,
+    hasCredits,
   };
 };
+
+const extractRowData = (row) => ([
+  row.values[1],
+  getVerifiedCellValue(row, 4),
+  getVerifiedCellValue(row, 5),
+  getVerifiedCellValue(row, 6),
+  getVerifiedCellValueForRemark(row, 7),
+  getVerifiedCellValueForRemark(row, 8),
+  row.values[3]
+]);
+
+const compareStudentGradeData = (current, incoming) => {
+  return (
+    current.student_grades_id === incoming.student_grades_id &&
+    current.mid_grade === incoming.mid_grade &&
+    current.final_grade === incoming.final_grade &&
+    current.grade === incoming.grade &&
+    normalizeValue(current.remarks) === normalizeValue(incoming.remarks) &&
+    current.credit === incoming.credit
+  );
+}
 
 module.exports = {
   getVerifiedCellValue,
@@ -259,4 +289,6 @@ module.exports = {
   getRemark,
   processedEncodedRow,
   processGradeRow,
+  extractRowData,
+  compareStudentGradeData
 };

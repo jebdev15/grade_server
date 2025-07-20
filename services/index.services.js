@@ -100,21 +100,19 @@ const getGraduateStudiesTable = async (conn, decode) => {
           CASE WHEN sg.grade IS NULL THEN 0 ELSE sg.grade END as grade, 
           CASE WHEN sg.mid_grade IS NULL THEN 0 ELSE sg.mid_grade END as mid_grade,
           CASE WHEN sg.final_grade IS NULL THEN 0 ELSE sg.final_grade END as final_grade,
-          sg.remarks as dbRemark,
-          
+          sg.remarks as dbRemark
         FROM class c 
         INNER JOIN student_load sl
-          USING (class_code) 
+          ON sl.class_code = c.class_code
         INNER JOIN student s 
-          USING (student_id)
+          ON s.student_id = sl.student_id
         INNER JOIN student_grades sg
-          USING (student_id)
+          ON sg.student_id = s.student_id 
+          AND sg.subject_code = c.subject_code
         WHERE 
-          c.class_code = '${decode.classCode}'AND 
-          sg.subject_code = c.subject_code AND
+          c.class_code = '${decode.classCode}' AND
           sg.school_year = '${decode.currentSchoolYear}' AND 
           sg.semester = '${decode.semester}' 
-        GROUP BY name
         ORDER BY name`
       );
       return rows;
