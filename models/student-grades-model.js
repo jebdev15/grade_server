@@ -163,7 +163,7 @@ const getSubjectCodeByClassCode = async (conn, class_code) => {
 // Function to fetch students with no credits
 const fetchStudentsWithNoCredits = async (conn, filter) => {
   const [rows] = await conn.query(
-    `SELECT COUNT(*) as totalNoOfNoCredits FROM student_grades 
+    `SELECT * FROM student_grades 
      WHERE credit < 1 
      AND (grade > 74 OR grade BETWEEN 1 AND 2)
      AND school_year = ? 
@@ -312,7 +312,7 @@ const fetchGraduateStudiesStudentGrades = async (conn, class_code) => {
         CONCAT(s.student_lastname, ', ', s.student_firstname, ' ', s.student_middlename) AS name, 
         CASE WHEN sg.grade IS NULL THEN 0 ELSE sg.grade END AS grade, 
         CASE WHEN sg.mid_grade IS NULL THEN 0 ELSE sg.mid_grade END AS mid_grade,
-        CASE WHEN sg.final_grade IS NULL THEN 0 ELSE sg.final_grade END AS end_grade,
+        CASE WHEN sg.final_grade IS NULL THEN 0 ELSE sg.final_grade END AS final_grade,
         sg.remarks AS dbRemark
       FROM class c 
       INNER JOIN student_load sl ON sl.class_code = c.class_code

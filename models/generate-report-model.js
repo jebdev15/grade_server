@@ -86,18 +86,19 @@ const fetchStudentGradeUpdateLog = async (conn, schoolYear, semester) => {
       CONCAT(TRIM(s.student_lastname), ', ', TRIM(s.student_firstname), ' ', TRIM(s.student_middlename)) AS student_name,
       s.student_id,
       sg.subject_code,
-      CAST(sgl.mid_grade AS DECIMAL(5,2)) AS mid_grade,
-      CAST(sgl.final_grade AS DECIMAL(5,2)) AS final_grade,
-      CAST(sgl.grade AS DECIMAL(5,2)) AS grade,
-      sgl.remarks,
-      CASE WHEN sgl.credit IS NULL THEN 0 ELSE CAST(sgl.credit AS DECIMAL(5,1)) END AS credit,
+      CAST(vsgl.mid_grade AS DECIMAL(5,2)) AS mid_grade,
+      CAST(vsgl.final_grade AS DECIMAL(5,2)) AS final_grade,
+      CAST(vsgl.prev_grade AS DECIMAL(5,2)) AS previous_grade,
+      CAST(vsgl.grade AS DECIMAL(5,2)) AS grade,
+      vsgl.remarks,
+      CASE WHEN vsgl.credit IS NULL THEN 0 ELSE CAST(vsgl.credit AS DECIMAL(5,1)) END AS credit,
       mel.user AS updated_by,
       mel.datetimestamp AS updated_at
-    FROM student_grades_log sgl
-    INNER JOIN student_grades sg ON sgl.student_grades_id = sg.student_grades_id
+    FROM view_student_grades_log vsgl
+    INNER JOIN student_grades sg ON vsgl.student_grades_id = sg.student_grades_id
     INNER JOIN student s ON sg.student_id = s.student_id
-    INNER JOIN modified_eventlog mel ON sgl.modified_eventkey = mel.modified_eventkey
-    WHERE sg.school_year = ? AND sg.semester = ? AND sgl.action_type = 'UPDATE'
+    INNER JOIN modified_eventlog mel ON vsgl.modified_eventkey = mel.modified_eventkey
+    WHERE sg.school_year = ? AND sg.semester = ? AND vsgl.action_type = 'UPDATE'
     ORDER BY updated_at DESC
   `;
 

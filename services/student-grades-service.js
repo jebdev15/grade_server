@@ -251,12 +251,12 @@ const getStudentsWithNoCredits = async (req) => {
         req.params
       );
       return {
-        count: rows[0].totalNoOfNoCredits,
+        count: rows.length,
         updated: updatedRows.affectedRows,
       };
     }
     return {
-      count: rows.length > 0 ? rows[0].totalNoOfNoCredits : 0,
+      count: rows.length > 0 ? rows.length : 0,
       updated: 0,
     };
   } catch (err) {
