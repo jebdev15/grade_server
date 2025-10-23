@@ -75,17 +75,17 @@ const getGradeTable = async (conn, decode) => {
           c.status
         FROM class c 
         INNER JOIN student_load sl
-          USING (class_code) 
+          ON sl.class_code = c.class_code
         INNER JOIN student s 
-          USING (student_id)
+          ON s.student_id = sl.student_id
         INNER JOIN student_grades sg
-          USING (student_id)
+          ON sg.student_id = s.student_id
         WHERE 
           c.class_code = '${decode.classCode}'AND 
           sg.subject_code = c.subject_code AND
           sg.school_year = '${decode.currentSchoolYear}' AND 
-          sg.semester = '${decode.semester}' 
-        GROUP BY name
+          sg.semester = '${decode.semester}' AND
+          sl.status = '2'
         ORDER BY name`
       );
       return rows;
@@ -112,7 +112,8 @@ const getGraduateStudiesTable = async (conn, decode) => {
         WHERE 
           c.class_code = '${decode.classCode}' AND
           sg.school_year = '${decode.currentSchoolYear}' AND 
-          sg.semester = '${decode.semester}' 
+          sg.semester = '${decode.semester}' AND
+          sl.status = '2'
         ORDER BY name`
       );
       return rows;
@@ -130,17 +131,17 @@ const getExcelFile = async (conn, decode) => {
           sg.remarks
         FROM class c 
         INNER JOIN student_load sl
-          USING (class_code) 
+          ON sl.class_code = c.class_code
         INNER JOIN student s 
-          USING (student_id)
+          ON s.student_id = sl.student_id
         INNER JOIN student_grades sg
-          USING (student_id)
+          ON sg.student_id = s.student_id
         WHERE 
           c.class_code = '${decode.classCode}'AND 
           sg.subject_code = c.subject_code AND
           sg.school_year = '${decode.currentSchoolYear}' AND 
-          sg.semester = '${decode.semester}' 
-        GROUP BY name
+          sg.semester = '${decode.semester}' AND
+          sl.status = '2'
         ORDER BY name`
     );
     return data;
@@ -159,17 +160,17 @@ const getGSExcelFile = async (conn, decode) => {
         sg.remarks
       FROM class c 
       INNER JOIN student_load sl
-        USING (class_code) 
+        ON sl.class_code = c.class_code
       INNER JOIN student s 
-        USING (student_id)
+        ON s.student_id = sl.student_id
       INNER JOIN student_grades sg
-        USING (student_id)
+        ON sg.student_id = s.student_id
       WHERE 
         c.class_code = '${decode.classCode}'AND 
         sg.subject_code = c.subject_code AND
         sg.school_year = '${decode.currentSchoolYear}' AND 
-        sg.semester = '${decode.semester}' 
-      GROUP BY name
+        sg.semester = '${decode.semester}' AND
+        sl.status = '2'
       ORDER BY name`
   );
   return data;

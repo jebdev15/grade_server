@@ -8,7 +8,7 @@ const getCurrentSchedule = async (conn) => {
 
 const getEmails = async (conn) => {
   const [rows] = await conn.query(
-    `select DISTINCT
+    `SELECT DISTINCT
       e.id,
       f.lastname as lastName,
       f.firstname as firstName,
@@ -16,9 +16,9 @@ const getEmails = async (conn) => {
       e.college_code,
       e.faculty_id,
       e.status
-      from emails e
-      inner join faculty f
-      using(faculty_id)`
+      FROM emails e
+      INNER JOIN faculty f
+      ON e.faculty_id = f.faculty_id`
   );
   return rows.length > 0 ? rows : [];
 };
@@ -149,17 +149,17 @@ const getGradeTableService = async (conn, decode) => {
           sg.modified_eventkey
         FROM class c 
         INNER JOIN student_load sl
-          USING (class_code) 
+          ON sl.class_code = c.class_code
         INNER JOIN student s 
-          USING (student_id)
+          ON s.student_id = sl.student_id
         INNER JOIN student_grades sg
-          USING (student_id)
+          ON sg.student_id = s.student_id
         WHERE 
           c.class_code = '${decode.classCode}' 
           AND sg.subject_code = c.subject_code
           AND sg.school_year = c.school_year
           AND sg.semester = c.semester
-        GROUP BY name
+          AND sl.status = '2'
         ORDER BY name`
   );
   return rows;
@@ -374,19 +374,19 @@ const getClassStudents = async (conn, req) => {
       class c 
     INNER JOIN 
       student_load sl
-    USING (class_code) 
+    ON sl.class_code = c.class_code
     INNER JOIN 
       student s 
-    USING (student_id)
+    ON s.student_id = sl.student_id
     INNER JOIN 
       student_grades sg
-    USING (student_id)
+    ON sg.student_id = s.student_id
     WHERE 
       class_code = ?
       AND sg.subject_code = c.subject_code
       AND sg.school_year = c.school_year
       AND sg.semester = c.semester 
-    GROUP BY studentName
+      AND sl.status = '2'
     ORDER BY studentName`;
   const [rows] = await conn.query(query, [classCode]);
   return rows;
@@ -444,7 +444,7 @@ const getStudentGrades = async (conn, req) => {
         student_grades sg
       INNER JOIN 
         student s
-      USING (student_id)
+      ON s.student_id = sg.student_id
       INNER JOIN modified_eventlog mel
       ON mel.modified_eventkey = sg.modified_eventkey
       WHERE 

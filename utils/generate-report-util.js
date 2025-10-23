@@ -27,7 +27,7 @@ const getCampus = (req) => {
     case "https://staging-gs.chmsu.edu.ph":
       campusInfoValue = "Staging Campus, Staging City, Negros Occidental";
       break;
-    case "https://gs.chmsu.edu.ph":
+    case "https://tal-gs.chmsu.edu.ph":
       campusInfoValue = "Main Campus, Talisay City, Negros Occidental";
       break;
     case "https://ft-gs.chmsu.edu.ph":

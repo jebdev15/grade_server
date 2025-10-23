@@ -6,7 +6,7 @@ const corsOptions = require('./config')
 
 module.exports = (app) => {
   app.enable('trust proxy');
-  app.use(logger("dev"));
+  app.use(logger("combined"));
   app.use(corsOptions);
   app.use(cookieParser());
   app.use(express.json());

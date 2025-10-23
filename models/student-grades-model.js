@@ -209,6 +209,7 @@ const getUndergradGradesByClassCode = async (conn, classCode) => {
         AND sg.subject_code = c.subject_code
         AND sg.school_year = c.school_year
         AND sg.semester = c.semester
+        AND sl.status = '2'
         ORDER BY name`,
     [classCode]
   );
@@ -303,7 +304,7 @@ const updateGradeRow = async (conn, data) => {
   return result;
 };
 
-// Function to fetch undergraduate student grades by class code
+// Function to fetch graduate studies student grades by class code
 const fetchGraduateStudiesStudentGrades = async (conn, class_code) => {
   const [rows] = await conn.query(
     `SELECT 
@@ -324,6 +325,7 @@ const fetchGraduateStudiesStudentGrades = async (conn, class_code) => {
         AND sg.semester = c.semester
       WHERE 
         c.class_code = ?
+        AND sl.status = '2'
       ORDER BY name`,
     [class_code]
   );
