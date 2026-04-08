@@ -34,13 +34,13 @@ const getLoad = async (conn, query, params) => {
           ELSE FALSE 
     END) AS canUpload
 FROM class c
-INNER JOIN section s ON c.section_id = s.section_id
+LEFT JOIN section s ON c.section_id = s.section_id
 LEFT JOIN student_load sl ON c.class_code = sl.class_code
 LEFT JOIN updates u ON u.class_code = c.class_code
 LEFT JOIN upload_grade_extensions uge ON uge.class_code = c.class_code
 LEFT JOIN tbl_class_update_logs ul ON ul.class_code = c.class_code
-INNER JOIN class_code_status ccs ON ccs.class_code = c.class_code
-INNER JOIN registrar_activity_online rao ON c.school_year = rao.schoolyear AND c.semester = rao.semester
+LEFT JOIN class_code_status ccs ON ccs.class_code = c.class_code
+LEFT JOIN registrar_activity_online rao ON c.school_year = rao.schoolyear AND c.semester = rao.semester
 WHERE c.faculty_id = ?
   AND c.school_year = ?
   AND c.semester = ?

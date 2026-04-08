@@ -94,7 +94,7 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
         INNER JOIN 
           section s 
           ON s.section_id = c.section_id
-        INNER JOIN 
+        LEFT JOIN 
           student_load sl
           ON sl.class_code = c.class_code
         INNER JOIN
@@ -382,7 +382,7 @@ const getClassStudents = async (conn, req) => {
       student_grades sg
     ON sg.student_id = s.student_id
     WHERE 
-      class_code = ?
+      c.class_code = ?
       AND sg.subject_code = c.subject_code
       AND sg.school_year = c.school_year
       AND sg.semester = c.semester 
