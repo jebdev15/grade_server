@@ -308,6 +308,24 @@ router.get("/getExcelFile", async (req, res) => {
   };
   const conn = await startConnection(req);
   const data = await getExcelFile(conn, decode);
+  const failureListLookup = {
+    studentIds: new Set(),
+    gradeIds: new Set(),
+  };
+  const [failureRows] = await conn.query(
+    `SELECT fls.student_id, fls.student_grades_id
+     FROM failure_list fl
+     INNER JOIN failure_list_students fls ON fl.failure_list_id = fls.failure_list_id
+     WHERE fl.class_code = ? AND fl.school_year = ? AND fl.semester = ?
+     ORDER BY fl.submitted_at DESC, fl.failure_list_id DESC`,
+    [decode.classCode, decode.currentSchoolYear, decode.semester]
+  );
+  failureRows.forEach((row) => {
+    failureListLookup.studentIds.add(row.student_id);
+    if (row.student_grades_id !== null && row.student_grades_id !== undefined) {
+      failureListLookup.gradeIds.add(row.student_grades_id);
+    }
+  });
   await endConnection(conn);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "CHMSU Grading System";
@@ -431,6 +449,14 @@ router.get("/getExcelFile", async (req, res) => {
     bold: true,
     size: 13,
   };
+  const legendCell = sheet.getCell("D12");
+  legendCell.value = "Listed in the Failure List (highlighted row)";
+  legendCell.font = { bold: true, size: 10 };
+  legendCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFFFF3B0" },
+  };
   sheet.getRow(13).values = [
     "Grade ID",
     "Student ID",
@@ -506,6 +532,18 @@ router.get("/getExcelFile", async (req, res) => {
       status,
       remarks: remark,
     };
+    const isListed =
+      failureListLookup.gradeIds.has(student_grades_id) ||
+      failureListLookup.studentIds.has(student_id);
+    if (isListed) {
+      sheet.getRow(currentRow).eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFF3B0" },
+        };
+      });
+    }
     const ave = (parseInt(item.mid_grade) + parseInt(item.final_grade)) / 2;
     const average = ave >= 1 && ave <= 5 ? ave : Math.round(ave);
     sheet.getCell(`F${currentRow}`).value = {

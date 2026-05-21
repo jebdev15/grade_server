@@ -78,7 +78,7 @@ const generateGradeSheetSubmissionLog = async (req) => {
       "Class Code",
       "Subject Code",
       "Program/Year Level/Section",
-      "Term Type",
+      "Term",
       "Last Update",
       "Submitted At",
     ];

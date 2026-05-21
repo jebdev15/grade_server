@@ -16,11 +16,25 @@
     "google-auth-library": "^9.13.0",
     "googleapis": "^118.0.0",
     "jsonwebtoken": "^9.0.2",
+    "module-alias": "^2.2.3",
     "morgan": "~1.9.1",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.2.0",
     "nodemailer": "^6.9.3",
     "url-encode-base64": "^1.0.0"
+  },
+  "_moduleAliases": {
+    "@shared": "shared",
+    "@modules": "modules",
+    "@config": "config",
+    "@controllers": "controllers",
+    "@services": "services",
+    "@routes": "routes",
+    "@middlewares": "middlewares",
+    "@utils": "utils",
+    "@models": "models",
+    "@dataAccess": "dataAccess",
+    "@public": "public"
   },
   "devDependencies": {
     "nodemon": "^2.0.20"

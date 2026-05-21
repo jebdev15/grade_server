@@ -4,6 +4,7 @@ const { startConnection, endConnection } = require("../config/conn");
 const model = require("../models/student-grades-model");
 const gradeFormatterUtil = require("../utils/grade-formatter-util");
 const { urlDecode } = require("url-encode-base64");
+const failureListService = require("../modules/shared/failure-list/failure-list.service");
 
 // Faculty - Student Grades
 const getStudents = async (req) => {
@@ -39,10 +40,34 @@ const updateStudentGrade = async (req) => {
     const userName = await model.eventkeyUserEmailRef(conn, req.cookies.email);
     const subjectCode = await model.getSubjectCodeByClassCode(conn, decodeClassCode);
     const subjectCredit = await model.getCredits(conn, subjectCode);
+    const failurePolicy = req.params.academic_level === "undergraduate"
+      ? await failureListService.getFailureListPolicy(conn, decodeClassCode, term_type)
+      : null;
+
+    if (
+      failurePolicy?.isApplicable &&
+      failurePolicy.isWindowClosed &&
+      failurePolicy.isSubmitted &&
+      failurePolicy.postDeadlineAction === "auto_pass"
+    ) {
+      await failureListService.applyAutoPassForNonListed(
+        conn,
+        failurePolicy.classInfo,
+        term_type,
+        failurePolicy.selectedStudents || []
+      );
+    }
 
     for (const grade of grades) {
       const processedGradeData = gradeFormatterUtil.processedEncodedRow(grade, req.params.academic_level);
-      const credit = processedGradeData.hasCredits ? subjectCredit : 0;
+      const policyReadyData = failurePolicy
+        ? failureListService.enforceFailureListPolicy(
+            failurePolicy,
+            { ...processedGradeData, student_id: grade.student_id },
+            grade.name || grade.student_id || grade.sg_id
+          )
+        : processedGradeData;
+      const credit = policyReadyData.hasCredits ? subjectCredit : 0;
 
       const modifiedEventKey = await model.insertModifiedEventLog(
         conn,
@@ -53,7 +78,7 @@ const updateStudentGrade = async (req) => {
         ipAddress
       );
 
-      const { hasCredits, ...filteredData } = processedGradeData;
+      const { hasCredits, ...filteredData } = policyReadyData;
       const data = { ...filteredData, credit, modifiedEventKey }
       try {
         const result = await model.updateStudentGrade(
@@ -115,12 +140,36 @@ const uploadExcel = async (req) => {
     const subjectCode = await model.getSubjectCodeByClassCode(conn, class_code);
     if (!subjectCode) throw new Error("Subject code not found");
     const subjectCredit = await model.getCredits(conn, subjectCode);
+    const failurePolicy = req.params.academic_level === "undergraduate"
+      ? await failureListService.getFailureListPolicy(conn, class_code, term_type)
+      : null;
+
+    if (
+      failurePolicy?.isApplicable &&
+      failurePolicy.isWindowClosed &&
+      failurePolicy.isSubmitted &&
+      failurePolicy.postDeadlineAction === "auto_pass"
+    ) {
+      await failureListService.applyAutoPassForNonListed(
+        conn,
+        failurePolicy.classInfo,
+        term_type,
+        failurePolicy.selectedStudents || []
+      );
+    }
     console.log({ sheetRowCount: sheet.rowCount})
     for (let i = 14; i <= sheet.rowCount; i++) {
       const row = sheet.getRow(i);
       const rowData = gradeFormatterUtil.extractRowData(row);
       if(!rowData[0]) continue;
       const processedUploadRow = gradeFormatterUtil.processGradeRow(rowData, req.params.academic_level);
+      if (failurePolicy) {
+        failureListService.enforceFailureListPolicy(
+          failurePolicy,
+          processedUploadRow,
+          rowData[6]
+        );
+      }
       try {
         const { hasCredits, ...filteredData } = processedUploadRow;
         const credit = hasCredits ? subjectCredit : 0;
@@ -196,7 +245,8 @@ const processRow = async (
   modifiedEventKey,
   conn,
   i,
-  academic_level
+  academic_level,
+  failurePolicy
 ) => {
   const rowData = [
     row.values[1], // Student grade id
@@ -212,6 +262,13 @@ const processRow = async (
       rowData,
       academic_level
     );
+    if (failurePolicy) {
+      failureListService.enforceFailureListPolicy(
+        failurePolicy,
+        processedRow,
+        rowData[6]
+      );
+    }
     const processedData = {
       ...processedRow,
       subjectCode,
@@ -310,8 +367,36 @@ const updateStudentGrades = async (req) => {
       class_code
     )
     const subjectCredit = await model.getCredits(conn, subjectCode);
+    const failurePolicy = academic_level === "undergraduate"
+      ? await failureListService.getFailureListPolicy(conn, class_code, term_type)
+      : null;
+
+    if (
+      failurePolicy?.isApplicable &&
+      failurePolicy.isWindowClosed &&
+      failurePolicy.isSubmitted &&
+      failurePolicy.postDeadlineAction === "auto_pass"
+    ) {
+      await failureListService.applyAutoPassForNonListed(
+        conn,
+        failurePolicy.classInfo,
+        term_type,
+        failurePolicy.selectedStudents || []
+      );
+    }
     const affectedRowsArr = await Promise.all(
       grades.map(async (grade) => {
+        if (failurePolicy) {
+          const processed = gradeFormatterUtil.processedEncodedRow(
+            grade,
+            academic_level
+          );
+          failureListService.enforceFailureListPolicy(
+            failurePolicy,
+            { ...processed, student_id: grade.student_id },
+            grade.name || grade.student_id || grade.sg_id
+          );
+        }
         const result = await updateEncodedRow(
           conn,
           grade,
@@ -367,6 +452,10 @@ const uploadGradeSheet = async (req) => {
     const subjectCode = await model.getSubjectCodeByClassCode(conn, class_code);
     if (!subjectCode) throw new Error("Subject code not found");
 
+    const failurePolicy = academic_level === "undergraduate"
+      ? await failureListService.getFailureListPolicy(conn, class_code, term_type)
+      : null;
+
     await conn.beginTransaction();
 
     const modifiedEventKey = await model.insertModifiedEventLog(
@@ -378,6 +467,20 @@ const uploadGradeSheet = async (req) => {
       req.ip
     );
 
+    if (
+      failurePolicy?.isApplicable &&
+      failurePolicy.isWindowClosed &&
+      failurePolicy.isSubmitted &&
+      failurePolicy.postDeadlineAction === "auto_pass"
+    ) {
+      await failureListService.applyAutoPassForNonListed(
+        conn,
+        failurePolicy.classInfo,
+        term_type,
+        failurePolicy.selectedStudents || []
+      );
+    }
+
     // Replace your for loop with:
     const rowPromises = [];
     for (let i = 14; i <= sheet.rowCount; i++) {
@@ -385,7 +488,15 @@ const uploadGradeSheet = async (req) => {
       // Skip empty rows (optional)
       if (!row.values[1]) continue;
       rowPromises.push(
-        processRow(row, subjectCode, modifiedEventKey, conn, i, academic_level)
+        processRow(
+          row,
+          subjectCode,
+          modifiedEventKey,
+          conn,
+          i,
+          academic_level,
+          failurePolicy
+        )
       );
     }
     await Promise.all(rowPromises);

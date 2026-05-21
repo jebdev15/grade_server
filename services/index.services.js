@@ -5,50 +5,64 @@ const isNaNOrNullOrEmpty = (value) => {
 const getLoad = async (conn, query, params) => {
   try {
     const [rows] = await conn.query(
-        `SELECT
-    c.class_code, 
+      `SELECT
+    c.class_code,
     c.subject_code,
     CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) AS section,
-    COUNT(DISTINCT sl.student_id) AS noStudents,
-
-    MAX(CASE WHEN u.term_type = 'midterm' THEN u.timestamp END) AS midterm_timestamp,
-    MAX(CASE WHEN u.term_type = 'endterm' THEN u.timestamp END) AS endterm_timestamp,
-    MAX(CASE WHEN ul.action_type = 'Submitted' AND ul.term_type = 'midterm' THEN ul.timestamp END) AS midterm_submitted_timestamp,
-    MAX(CASE WHEN ul.action_type = 'Submitted' AND ul.term_type = 'endterm' THEN ul.timestamp END) AS endterm_submitted_timestamp,
-    -- Check if the subject belongs to graduate studies
+    COALESCE(sl.noStudents, 0) AS noStudents,
+    u.midterm_timestamp,
+    u.endterm_timestamp,
+    ul.midterm_submitted_timestamp,
+    ul.endterm_submitted_timestamp,
     EXISTS (
         SELECT 1 FROM graduate_studies gs WHERE gs.subject_code = c.subject_code
     ) AS isGraduateStudies,
-
-    MAX(CASE 
-        WHEN uge.status = 'approved' AND uge.deadline_extend_end >= CURDATE() THEN TRUE 
-        ELSE FALSE 
-    END) AS is_deadline_extended,
+    COALESCE(uge.is_deadline_extended, 0) AS is_deadline_extended,
     CONCAT(rao.term_type,'_','status') AS term_type,
-    CASE WHEN rao.term_type = 'midterm' THEN ccs.midterm_status ELSE ccs.endterm_status END AS classLoadStatus,
-    MAX(CASE 
-          WHEN uge.status = 'approved' 
-          AND uge.deadline_extend_end >= CURDATE() 
-          OR (rao.to >= CURDATE() AND CONCAT(rao.term_type,'_','status') <> 1)
-          THEN TRUE 
-          ELSE FALSE 
-    END) AS canUpload
+    CASE WHEN rao.term_type = 'midterm' THEN CAST(ccs.midterm_status AS UNSIGNED) ELSE CAST(ccs.endterm_status AS UNSIGNED) END AS classLoadStatus,
+    CASE
+      WHEN COALESCE(uge.is_deadline_extended, 0) = 1
+        OR (rao.to >= CURDATE() AND CONCAT(rao.term_type,'_','status') <> 1)
+      THEN TRUE
+      ELSE FALSE
+    END AS canUpload
 FROM class c
 LEFT JOIN section s ON c.section_id = s.section_id
-LEFT JOIN student_load sl ON c.class_code = sl.class_code
-LEFT JOIN updates u ON u.class_code = c.class_code
-LEFT JOIN upload_grade_extensions uge ON uge.class_code = c.class_code
-LEFT JOIN tbl_class_update_logs ul ON ul.class_code = c.class_code
+LEFT JOIN (
+    SELECT class_code, COUNT(DISTINCT student_id) AS noStudents
+    FROM student_load
+    WHERE status = '2'
+    GROUP BY class_code
+) sl ON sl.class_code = c.class_code
+LEFT JOIN (
+    SELECT class_code,
+      MAX(CASE WHEN term_type = 'midterm' THEN timestamp END) AS midterm_timestamp,
+      MAX(CASE WHEN term_type = 'endterm' THEN timestamp END) AS endterm_timestamp
+    FROM updates
+    GROUP BY class_code
+) u ON u.class_code = c.class_code
+LEFT JOIN (
+    SELECT class_code,
+      MAX(CASE WHEN action_type = 'Submitted' AND term_type = 'midterm' THEN timestamp END) AS midterm_submitted_timestamp,
+      MAX(CASE WHEN action_type = 'Submitted' AND term_type = 'endterm' THEN timestamp END) AS endterm_submitted_timestamp
+    FROM tbl_class_update_logs
+    GROUP BY class_code
+) ul ON ul.class_code = c.class_code
+LEFT JOIN (
+    SELECT class_code,
+      MAX(CASE WHEN status = 'approved' AND deadline_extend_end >= CURDATE() THEN 1 ELSE 0 END) AS is_deadline_extended
+    FROM upload_grade_extensions
+    GROUP BY class_code
+) uge ON uge.class_code = c.class_code
 LEFT JOIN class_code_status ccs ON ccs.class_code = c.class_code
 LEFT JOIN registrar_activity_online rao ON c.school_year = rao.schoolyear AND c.semester = rao.semester
 WHERE c.faculty_id = ?
   AND c.school_year = ?
   AND c.semester = ?
 ${query}
-GROUP BY c.class_code
 ORDER BY section;`, params
-      );
-      return rows;
+    );
+    return rows;
   } catch (error) {
     console.error(error);
     return [];
@@ -56,8 +70,8 @@ ORDER BY section;`, params
 }
 
 const getGradeTable = async (conn, decode) => {
-    const [rows] = await conn.query(
-        `SELECT 
+  const [rows] = await conn.query(
+    `SELECT 
           sg.student_grades_id as sg_id, 
           s.student_id, 
           CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as name, 
@@ -87,13 +101,13 @@ const getGradeTable = async (conn, decode) => {
           sg.semester = '${decode.semester}' AND
           sl.status = '2'
         ORDER BY name`
-      );
-      return rows;
-} 
+  );
+  return rows;
+}
 
 const getGraduateStudiesTable = async (conn, decode) => {
-    const [rows] = await conn.query(
-        `SELECT 
+  const [rows] = await conn.query(
+    `SELECT 
           sg.student_grades_id as sg_id, 
           s.student_id, 
           CONCAT(s.student_lastname, ', ', s.student_firstname, ' ',s.student_middlename) as name, 
@@ -115,13 +129,13 @@ const getGraduateStudiesTable = async (conn, decode) => {
           sg.semester = '${decode.semester}' AND
           sl.status = '2'
         ORDER BY name`
-      );
-      return rows;
+  );
+  return rows;
 }
 
 const getExcelFile = async (conn, decode) => {
-    const [data] = await conn.query(
-        `SELECT 
+  const [data] = await conn.query(
+    `SELECT 
           c.subject_code, 
           sg.student_grades_id, 
           s.student_id, 
@@ -143,13 +157,13 @@ const getExcelFile = async (conn, decode) => {
           sg.semester = '${decode.semester}' AND
           sl.status = '2'
         ORDER BY name`
-    );
-    return data;
+  );
+  return data;
 }
 
 const getGSExcelFile = async (conn, decode) => {
   const [data] = await conn.query(
-      `SELECT 
+    `SELECT 
         c.subject_code, 
         sg.student_grades_id, 
         s.student_id, 
@@ -179,49 +193,49 @@ const getGSExcelFile = async (conn, decode) => {
 const indexUpdateClassCodeStatus = async (conn, email_used, class_code, term_type) => {
   try {
     const termType = term_type === 'midterm' ? 'midterm_status' : 'endterm_status';
-    const [rows] = await conn.query(`UPDATE class_code_status SET ${termType} = ? WHERE class_code = ?`,[1, class_code]);
+    const [rows] = await conn.query(`UPDATE class_code_status SET ${termType} = ? WHERE class_code = ?`, [1, class_code]);
     let response;
     const logClassStatus = rows.affectedRows > 0 && await indexInsertClassCodeUpdateLog(conn, email_used, class_code, term_type);
-    if(rows.affectedRows > 0) {
-      response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status"} : {"success": false ,"message": "Failed to Update"}
+    if (rows.affectedRows > 0) {
+      response = logClassStatus.affectedRows > 0 ? { "success": true, "message": "Successfully Updated Status" } : { "success": false, "message": "Failed to Update" }
     } else {
-      response = {success: false, message: "Status Updated", isUpdated: rows.changedRows, isLogged: logClassStatus.affectedRows}
+      response = { success: false, message: "Status Updated", isUpdated: rows.changedRows, isLogged: logClassStatus.affectedRows }
     }
-    
+
     return response;
   } catch (error) {
     console.log(error);
-    return {"success": false ,"message": "Failed to Update", "error": error.message};
+    return { "success": false, "message": "Failed to Update", "error": error.message };
   }
 }
 
 const indexInsertClassCodeUpdateLog = async (conn, email_used, class_code, term_type) => {
   try {
-    const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, 'Submitted', class_code, term_type ]);
+    const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, 'Submitted', class_code, term_type]);
     return rows;
   } catch (error) {
     console.log(error);
     return [];
   }
-  
+
 }
 
 const indexInsertMidtermClassCodeUpdateLog = async (conn, email_used, decodedClassCode) => {
-  const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [ email_used, 'Submitted', decodedClassCode, 'midterm' ]);
-  
+  const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, 'Submitted', decodedClassCode, 'midterm']);
+
   const checkClassCodeResponse = await indexCheckIfClassCodeExistsInClassCodeStatus(conn, decodedClassCode);
-  return {checkClassCodeResponse, rows};
+  return { checkClassCodeResponse, rows };
 }
 
 const indexInsertIntoClassCodeStatus = async (conn, decodedClassCode) => {
   const [rows] = await conn.query(`INSERT INTO class_code_status(class_code) VALUES(?)`, [decodedClassCode]);
-  console.log({insert: rows})
+  console.log({ insert: rows })
   return rows;
 }
 
 const indexUpdateExistingClassCodeInClassCodeStatus = async (conn, decodedClassCode) => {
-  const [rows] = await conn.query(`UPDATE class_code_status SET midterm_status = ? WHERE class_code = ?`,[1, decodedClassCode]);
-  console.log({update: rows})
+  const [rows] = await conn.query(`UPDATE class_code_status SET midterm_status = ? WHERE class_code = ?`, [1, decodedClassCode]);
+  console.log({ update: rows })
   return rows;
 }
 const indexCheckIfClassCodeExistsInClassCodeStatus = async (conn, decodedClassCode) => {
@@ -232,7 +246,7 @@ const indexCheckIfClassCodeExistsInClassCodeStatus = async (conn, decodedClassCo
     // `result` is an array, with the first element being the rows
     const [rows] = result;
     const classCodeExists = rows.length > 0;
-    if(classCodeExists) {
+    if (classCodeExists) {
       await indexUpdateExistingClassCodeInClassCodeStatus(conn, decodedClassCode);
     } else {
       await indexInsertIntoClassCodeStatus(conn, decodedClassCode);
@@ -244,7 +258,7 @@ const indexCheckIfClassCodeExistsInClassCodeStatus = async (conn, decodedClassCo
   }
 }
 const indexUpdateGrade = async (conn, grade, modifiedEventKey) => {
-  
+
   let { sg_id, mid_grade, final_grade, dbRemark, status } = grade;
   // Handle isNaN for mid_grade and final_grade
   mid_grade = isNaNOrNullOrEmpty(mid_grade) ? 0 : mid_grade;
@@ -277,8 +291,8 @@ const indexUpdateGrade = async (conn, grade, modifiedEventKey) => {
       modifiedEventKey,
       sg_id,
     ]
-  );  
-  if(rows.affectedRows > 0) {
+  );
+  if (rows.affectedRows > 0) {
     await conn.execute(
       "INSERT INTO grade_logs (student_grades_id, modified_eventkey, status) VALUES(?, ?, ?)",
       [sg_id, modifiedEventKey, "NP"]
@@ -290,12 +304,12 @@ const indexUpdateGrade = async (conn, grade, modifiedEventKey) => {
 const indexUpdateGraduateStudiesGrade = async (conn, gradeData, modifiedEventKey) => {
   let { sg_id, mid_grade, end_grade, grade, dbRemark } = gradeData;
   let status = "";
-    const parsedGrade = parseFloat(grade);
-    if(parsedGrade > 0) {
-      status = (parsedGrade >= 1 && parsedGrade <= 2) ? "passed" : "failed";
-    }
-    const remarks = (status === 'passed' || status === 'failed') ? status : dbRemark;
-    const hasCredits = remarks === 'passed' ? `(${`subject`}.lec_units + ${`subject`}.lab_units)` : '0';
+  const parsedGrade = parseFloat(grade);
+  if (parsedGrade > 0) {
+    status = (parsedGrade >= 1 && parsedGrade <= 2) ? "passed" : "failed";
+  }
+  const remarks = (status === 'passed' || status === 'failed') ? status : dbRemark;
+  const hasCredits = remarks === 'passed' ? `(${`subject`}.lec_units + ${`subject`}.lab_units)` : '0';
   const [rows] = await conn.query(
     `UPDATE 
       student_grades,
@@ -318,7 +332,7 @@ const indexUpdateGraduateStudiesGrade = async (conn, gradeData, modifiedEventKey
       sg_id,
     ]
   );
-  if(rows.affectedRows > 0) {
+  if (rows.affectedRows > 0) {
     await conn.execute(
       "INSERT INTO grade_logs (student_grades_id, modified_eventkey, status) VALUES(?, ?, ?)",
       [sg_id, modifiedEventKey, "NP"]
@@ -327,13 +341,13 @@ const indexUpdateGraduateStudiesGrade = async (conn, gradeData, modifiedEventKey
   return rows;
 }
 module.exports = {
-    getLoad,
-    getGradeTable,
-    getGraduateStudiesTable,
-    getExcelFile,
-    getGSExcelFile,
-    indexUpdateClassCodeStatus,
-    indexInsertMidtermClassCodeUpdateLog,
-    indexUpdateGrade,
-    indexUpdateGraduateStudiesGrade
+  getLoad,
+  getGradeTable,
+  getGraduateStudiesTable,
+  getExcelFile,
+  getGSExcelFile,
+  indexUpdateClassCodeStatus,
+  indexInsertMidtermClassCodeUpdateLog,
+  indexUpdateGrade,
+  indexUpdateGraduateStudiesGrade
 }

@@ -1,3 +1,4 @@
+require("module-alias/register");
 const express = require("express");
 var debug = require("debug")("server");
 const app = express();
