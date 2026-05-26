@@ -64,7 +64,8 @@ const updateStudentGrade = async (req) => {
         ? failureListService.enforceFailureListPolicy(
             failurePolicy,
             { ...processedGradeData, student_id: grade.student_id },
-            grade.name || grade.student_id || grade.sg_id
+            grade.name || grade.student_id || grade.sg_id,
+            { restrictSpecialRemarksToListed: true }
           )
         : processedGradeData;
       const credit = policyReadyData.hasCredits ? subjectCredit : 0;
@@ -167,7 +168,8 @@ const uploadExcel = async (req) => {
         failureListService.enforceFailureListPolicy(
           failurePolicy,
           processedUploadRow,
-          rowData[6]
+          rowData[6],
+          { restrictSpecialRemarksToListed: true }
         );
       }
       try {

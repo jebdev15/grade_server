@@ -49,6 +49,8 @@ const submitList = async (conn, classCode, termType, selectedStudents) => {
   } catch (error) {
     await conn.rollback();
     throw error;
+  } finally {
+    await conn.release();
   }
 };
 

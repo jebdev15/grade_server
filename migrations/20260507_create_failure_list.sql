@@ -7,7 +7,7 @@ CREATE TABLE `failure_list_window` (
   `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
   `school_year` int NOT NULL,
   `semester` varchar(20) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
-  `term_type` enum('midterm','endterm') CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `term_type` enum('midterm','endterm') CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL DEFAULT 'endterm',
   `start_date` date NOT NULL,
   `end_date` date NOT NULL,
   `post_deadline_action` enum('auto_pass','restrict_only') CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL DEFAULT 'restrict_only',

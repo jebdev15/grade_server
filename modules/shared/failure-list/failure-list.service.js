@@ -297,13 +297,13 @@ const applyAutoPassForNonListed = async (conn, classInfo, termType, students) =>
   return rows;
 };
 
-const enforceFailureListPolicy = (policy, gradeData, contextLabel) => {
-  if (!policy?.isApplicable || !policy.isWindowClosed || !policy.isSubmitted) {
-    return gradeData;
-  }
-
-  const remarks = String(gradeData.remarks || "").toLowerCase();
-  if (SPECIAL_REMARKS.has(remarks)) {
+const enforceFailureListPolicy = (
+  policy,
+  gradeData,
+  contextLabel,
+  options = {}
+) => {
+  if (!policy?.isApplicable) {
     return gradeData;
   }
 
@@ -311,33 +311,42 @@ const enforceFailureListPolicy = (policy, gradeData, contextLabel) => {
     policy.studentGradeIds.has(gradeData.student_grades_id) ||
     policy.studentIds.has(gradeData.student_id);
 
+  const remarks = String(
+    gradeData.remarks || gradeData.dbRemark || gradeData.remark || ""
+  ).toLowerCase();
+  if (SPECIAL_REMARKS.has(remarks)) {
+    if (options.restrictSpecialRemarksToListed && !isListed) {
+      throw new Error(
+        "List of Failures is active. Special remarks are only allowed for listed students."
+      );
+    }
+    return gradeData;
+  }
+
   const mid = Number(gradeData.mid_grade || 0);
   const finalGrade = Number(gradeData.final_grade || 0);
   const averageGrade = Number(gradeData.grade || 0) || (mid > 0 && finalGrade > 0 ? Math.round((mid + finalGrade) / 2) : 0);
 
-  const hasFailingFinal = finalGrade > 0 && finalGrade < 75;
   const hasFailingAverage = averageGrade > 0 && averageGrade < 75;
-  const hasPassingFinal = finalGrade >= 75;
   const hasPassingAverage = averageGrade >= 75;
 
   const label = contextLabel ? ` (${contextLabel})` : "";
 
   if (!isListed) {
-    const hasFailing = hasFailingFinal || hasFailingAverage;
-
+    const hasFailing = hasFailingAverage;
     if (hasFailing) {
       throw new Error(
-        `List of Failures is finalized. Failing grades are only allowed for listed students${label}.`
+        "The List of Failures has been finalized. Only students in the highlighted rows are allowed to receive failing grades."
       );
     }
   }
 
   if (isListed) {
-    const hasPassing = hasPassingFinal || hasPassingAverage;
+    const hasPassing = hasPassingAverage;
 
     if (hasPassing) {
       throw new Error(
-        `List of Failures is finalized. Listed students must receive failing grades${label}.`
+        `The List of Failures has been finalized. Students in the highlighted rows must receive failing grades.`
       );
     }
   }
