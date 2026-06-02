@@ -1,15 +1,4 @@
-const SPECIAL_REMARKS = new Set([
-  "inc",
-  "drp",
-  "na",
-  "ng",
-  "w",
-  "incomplete",
-  "dropped",
-  "no attendance",
-  "no grade",
-  "withdrawn",
-]);
+const { SPECIAL_REMARKS } = require("@shared/failure-list/config/failure-list.config");
 
 const normalizeTermType = (value) => {
   if (!value) return value;
@@ -51,7 +40,7 @@ const isGraduateSubject = async (conn, subjectCode) => {
   return rows.length > 0;
 };
 
-const getFailureListWindow = async (conn, schoolYear, semester, termType) => {
+const getFailureListWindow = async (conn, schoolYear, semester) => {
   const [rows] = await conn.query(
     `SELECT *
      FROM failure_list_window
@@ -140,8 +129,7 @@ const getFailureListPolicy = async (conn, classCode, termType) => {
   const window = await getFailureListWindow(
     conn,
     classInfo.school_year,
-    classInfo.semester,
-    normalizedTermType
+    classInfo.semester
   );
   const list = await getFailureList(conn, classInfo, normalizedTermType);
   const students = await getFailureListStudents(conn, list?.failure_list_id);
@@ -161,7 +149,7 @@ const getFailureListPolicy = async (conn, classCode, termType) => {
   );
 
   return {
-    isApplicable: true,
+    isApplicable: !!window,
     termType: normalizedTermType,
     classInfo,
     window,
@@ -317,7 +305,7 @@ const enforceFailureListPolicy = (
   if (SPECIAL_REMARKS.has(remarks)) {
     if (options.restrictSpecialRemarksToListed && !isListed) {
       throw new Error(
-        "List of Failures is active. Special remarks are only allowed for listed students."
+        "The List of Failures is active. Special remarks are only allowed for highlighted rows."
       );
     }
     return gradeData;

@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "grading-portal",         // ✅ Matches PM2 name in deploy-backend.yml
+      name: "grading-portal-api",         // ✅ Matches PM2 name in deploy-backend.yml
       script: "./app.js",           // ✅ Uses app.js entrypoint
       instances: 1,                        // ✅ Use 1 for cPanel shared hosting (max may exceed limits)
       exec_mode: "fork",                   // ✅ Use fork for cPanel (cluster may not be supported)
@@ -20,7 +20,7 @@ module.exports = {
       // ✅ Staging environment
       env_staging: {
         NODE_ENV: "staging",
-        PORT: 4000,                        // ✅ Staging port
+        PORT: 4001,                        // ✅ Staging port
       },
 
       // ✅ Production environment

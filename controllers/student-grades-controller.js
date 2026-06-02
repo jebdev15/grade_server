@@ -7,7 +7,6 @@ const getStudents = async (req, res) => {
     const rows = await service.getStudents(req);
     res.status(200).json({ rows, error: null });
   } catch (err) {
-    console.error(err.message);
     res.status(500).json({ rows: [], error: err.message });
   }
 }
@@ -18,8 +17,8 @@ const updateStudentGrade = async (req, res) => {
     const result = await service.updateStudentGrade(req);
     res.json(result);
   } catch (err) {
-    console.error("Update Student Grades Error:", err.message);
-    res.status(500).json({ error: err.message });
+    const status = err.statusCode || 400;
+    res.status(status).json({ message: err.message, err });
   }
 };
 
@@ -29,10 +28,8 @@ const uploadExcel = async (req, res) => {
     const result = await service.uploadExcel(req);
     res.json({ message: "Successfully uploaded grade sheet", result});
   } catch (err) {
-    console.error("Upload Grade Sheet Failed:", err.message);
-    res
-      .status(500)
-      .json({ message: err.message || "Failed to upload grade sheet" });
+    const status = err.statusCode || 400;
+    res.status(status).json({ message: err.message || "Failed to upload grade sheet" });
   }
 };
 
@@ -45,7 +42,6 @@ const getStudentsWithNoCredits = async (req, res) => {
       .status(200)
       .json({ rows, message: "Successfully fetched", error: null });
   } catch (err) {
-    console.error(err.message);
     res
       .status(500)
       .json({ rows: [], message: "Failed to fetch", error: err.message });
@@ -58,7 +54,6 @@ const getStudentsWithGradesByClassCode = async (req, res) => {
     const rows = await service.getStudentsWithGradesByClassCode(req);
     res.status(200).json({ rows, error: null });
   } catch (err) {
-    console.error(err.message);
     res.status(500).json({ rows: [], error: err.message });
   }
 };
@@ -75,7 +70,6 @@ const updateStudentGrades = async (req, res) => {
         totalAffectedRows,
       });
   } catch (err) {
-    console.error("Update grade failed:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -86,7 +80,6 @@ const uploadGradeSheet = async (req, res) => {
     const result = await service.uploadGradeSheet(req);
     res.json({ message: "Successfully uploaded grade sheet", result });
   } catch (err) {
-    console.error("Upload Grade Sheet Failed:", err.message);
     res
       .status(500)
       .json({ message: err.message || "Failed to upload grade sheet" });
