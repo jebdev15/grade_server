@@ -9,5 +9,6 @@ setupRoutes(app);
 app.set("port", process.env.PORT || 3001);
 
 var server = app.listen(app.get("port"), () => {
+  console.log(`The Grading Portal API is running`);
   debug("Express server listening on port " + server.address().port);
 });
