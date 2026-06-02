@@ -267,15 +267,7 @@ const updateGradeRow = async (conn, data) => {
     modified_eventkey,
     subject_code,
   } = data;
-    student_grades_id,
-    mid_grade,
-    final_grade,
-    grade,
-    remarks,
-    credit,
-    modified_eventkey,
-    subject_code,
-  })
+
   const [result] = await conn.query(
     `UPDATE student_grades AS sg
      JOIN subject AS subj ON sg.subject_code = subj.subject_code
