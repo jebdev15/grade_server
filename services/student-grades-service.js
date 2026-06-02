@@ -179,13 +179,7 @@ const uploadExcel = async (req) => {
         if (noChanges) continue;
 
         const result = await model.updateGradeRow(conn, data);
-          currentData: currentData[0],
-          processedRow: data,
-          noChanges,
-          affectedRows: result.affectedRows,
-          changedRows: result.changedRows,
-          result
-        });
+
         totalAffectedRows += result.affectedRows || 0;
         totalChangedRows += result.changedRows || 0;
       } catch (err) {
