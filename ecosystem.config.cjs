@@ -14,19 +14,22 @@ module.exports = {
       // ✅ Development environment
       env: {
         NODE_ENV: "development",
-        PORT: 3001,                        // ✅ Matches VITE_API_URL port in frontend .env
+        PORT: 3001,    
+        TZ: "Asia/Manila",                    // ✅ Matches VITE_API_URL port in frontend .env
       },
 
       // ✅ Staging environment
       env_staging: {
         NODE_ENV: "staging",
-        PORT: 4001,                        // ✅ Staging port
+        PORT: 4001,    
+        TZ: "Asia/Manila",                    // ✅ Staging port
       },
 
       // ✅ Production environment
       env_production: {
         NODE_ENV: "production",
-        PORT: 80,
+        PORT: 3001,
+        TZ: "Asia/Manila",
       },
 
       // ✅ Log management
