@@ -2,9 +2,15 @@
   "name": "server",
   "version": "0.0.0",
   "private": true,
+
+  "engines": {
+    "node": "16.x"
+  },
+
   "scripts": {
     "start": "nodemon app.js"
   },
+
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cookie-parser": "~1.4.4",
@@ -23,6 +29,7 @@
     "nodemailer": "^6.9.3",
     "url-encode-base64": "^1.0.0"
   },
+
   "_moduleAliases": {
     "@shared": "shared",
     "@modules": "modules",
@@ -36,6 +43,7 @@
     "@dataAccess": "dataAccess",
     "@public": "public"
   },
+  
   "devDependencies": {
     "nodemon": "^2.0.20"
   }

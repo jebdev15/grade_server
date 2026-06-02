@@ -40,7 +40,7 @@ jobs:
           # Make sure this port matches your server's SSH port (default is 22)
           port: ${{ secrets.SSH_PORT }}
           # Deploying to a separate API folder, NOT the public web root
-          source: ".,!.git/,!.github/,!node_modules/,!.env" # Exclude unnecessary files
+          source: ".,!.git/,!.github/,!node_modules/,!.env,!package-lock.json" # Exclude unnecessary files
           # Deploying to a separate API folder, NOT the public web root
           target: "/home/${{ secrets.SSH_USERNAME }}/public_html/subdomains/staging-grading-portal-api"
 
