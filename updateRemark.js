@@ -8,16 +8,13 @@
 //         user: JSON.parse(process.env.DB_USER)[0],
 //         password: JSON.parse(process.env.DB_PASSWORD)[0],
 //       });
-//       // console.log("Database Connected.");
 //       return conn;
 //     } catch (error) {
-//       console.error(`ERRDB. - ${error.message}`);
 //     }
 // };
 
 // const endConnection = async (conn) => {
 //     await conn.end();
-//     console.log('Connection Closed.');
 // };
 
 // const testConnection = async () => {
@@ -36,14 +33,12 @@
 //             `);
 //         await fetchRows(rows);
 //     } catch (error) {
-//         console.error(`ERRDB... - ${error.message}`);
 //     } finally {
 //         await endConnection(conn);
 //     }
 // };
 // const fetchRows = async (rows) => {
 //     rows.map(({student_grades_id}) => {
-//         console.log(student_grades_id);
 //         updateRemark(student_grades_id);
 //     })
 // }
@@ -55,9 +50,7 @@
 //             SET remarks = 'passed'
 //             WHERE student_grades_id = ?
 //             `,[id]);
-//         console.log(rows.changedRows)
 //     } catch (error) {
-//         console.error(`ERRDB... - ${error.message}`);
 //     } finally {
 //         await endConnection(conn);
 //     }

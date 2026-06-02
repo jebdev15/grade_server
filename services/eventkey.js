@@ -46,7 +46,6 @@ const checkIfHasRemarkInGradeSheet = async (conn, rowData, subjectCode, modified
     const [rows] = await conn.query(query,params);
     return rows;
   } catch (error) {
-    console.error({error, message: error.message});
     return [];
   }
 }
@@ -74,7 +73,6 @@ const checkIfHasRemarkInGSGradeSheet = async (conn, rowData, subjectCode, modifi
     const [rows] = await conn.query(query,params);
     return rows;
   } catch (error) {
-    console.error({error, message: error.message});
     return rows;
   }
 }

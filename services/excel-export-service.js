@@ -188,7 +188,6 @@ const generateGradesExcel = async (req) => {
 
     return workbook;
   } catch (error) {
-    // console.error("Error generating Excel file:", error);
     throw error; // Rethrow the error after logging
   } finally {
     await endConnection(conn);

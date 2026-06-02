@@ -64,7 +64,6 @@ ORDER BY section;`, params
     );
     return rows;
   } catch (error) {
-    console.error(error);
     return [];
   }
 }
@@ -204,7 +203,6 @@ const indexUpdateClassCodeStatus = async (conn, email_used, class_code, term_typ
 
     return response;
   } catch (error) {
-    console.log(error);
     return { "success": false, "message": "Failed to Update", "error": error.message };
   }
 }
@@ -214,7 +212,6 @@ const indexInsertClassCodeUpdateLog = async (conn, email_used, class_code, term_
     const [rows] = await conn.query(`INSERT INTO tbl_class_update_logs(email_used, action_type, class_code, term_type) VALUES(?, ?, ?, ?)`, [email_used, 'Submitted', class_code, term_type]);
     return rows;
   } catch (error) {
-    console.log(error);
     return [];
   }
 
@@ -229,13 +226,11 @@ const indexInsertMidtermClassCodeUpdateLog = async (conn, email_used, decodedCla
 
 const indexInsertIntoClassCodeStatus = async (conn, decodedClassCode) => {
   const [rows] = await conn.query(`INSERT INTO class_code_status(class_code) VALUES(?)`, [decodedClassCode]);
-  console.log({ insert: rows })
   return rows;
 }
 
 const indexUpdateExistingClassCodeInClassCodeStatus = async (conn, decodedClassCode) => {
   const [rows] = await conn.query(`UPDATE class_code_status SET midterm_status = ? WHERE class_code = ?`, [1, decodedClassCode]);
-  console.log({ update: rows })
   return rows;
 }
 const indexCheckIfClassCodeExistsInClassCodeStatus = async (conn, decodedClassCode) => {
@@ -253,7 +248,6 @@ const indexCheckIfClassCodeExistsInClassCodeStatus = async (conn, decodedClassCo
     }
     return classCodeExists;
   } catch (err) {
-    console.error("Error checking class code:", err);
     return false; // Or handle error as needed
   }
 }

@@ -7,9 +7,6 @@ const corsOptions = {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`Blocked by CORS: ${origin}`);
-      }
       callback(new Error('Not allowed by CORS'));
     }
   },

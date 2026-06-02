@@ -17,14 +17,12 @@ const verifyGoogleToken = async (req, res, next) => {
     });
 
     const payload = ticket.getPayload();
-    // console.log(payload); // This contains the decoded JWT information
 
     // You can store the payload in req.user for use in subsequent middleware or route handlers
     req.user = payload;
 
     next(); // Proceed to the next middleware or route handler
   } catch (error) {
-    console.error('Error verifying Google token:', error);
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 };

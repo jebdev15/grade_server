@@ -76,7 +76,6 @@ const FacultyService = {
         return []
       }
     } catch (err) {
-      console.error(err.message);
     } finally {
       await endConnection(conn);
     }

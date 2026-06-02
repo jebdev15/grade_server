@@ -31,7 +31,6 @@ const updateStudentGrade = async (req) => {
   const { grades, class_code, method, term_type } = req.body;
   const ipAddress = req.ip;
   const conn = await startConnection(req);
-  console.log({ academic_level: req.params.academic_level })
   try {
     await conn.beginTransaction();
     const decodeClassCode = urlDecode(class_code);
@@ -158,7 +157,6 @@ const uploadExcel = async (req) => {
         failurePolicy.selectedStudents || []
       );
     }
-    console.log({ sheetRowCount: sheet.rowCount})
     for (let i = 14; i <= sheet.rowCount; i++) {
       const row = sheet.getRow(i);
       const rowData = gradeFormatterUtil.extractRowData(row);
@@ -181,7 +179,6 @@ const uploadExcel = async (req) => {
         if (noChanges) continue;
 
         const result = await model.updateGradeRow(conn, data);
-        console.log(`rowIndex: ${i}`, {
           currentData: currentData[0],
           processedRow: data,
           noChanges,
@@ -197,7 +194,6 @@ const uploadExcel = async (req) => {
         );
       }
     }
-    console.log({ totalAffectedRows, totalChangedRows });
     await model.insertUpdateLog(conn, class_code, method, term_type);
     if (totalAffectedRows === 0) {
       await conn.rollback();

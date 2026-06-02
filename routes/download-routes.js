@@ -30,7 +30,6 @@ const getCampus = (req) => {
     default:
       campusInfoValue = 'Default Campus, Default City, Negros Occidental';
   }
-  console.log(refererOrigin, campusInfoValue);
   return campusInfoValue
 }
 
@@ -250,7 +249,6 @@ router.get('/downloadGradeSheetSubmissionLogs', async (req, res) => {
       res.setHeader("Content-Disposition", "attachment; filename=" + "File.xlsx");
       workbook.xlsx.write(res).then(() => res.end());
   } catch(err) {
-    console.error(err);
     res.status(500).json(err);
   } finally {
     await endConnection(conn);
@@ -437,7 +435,6 @@ router.get('/downloadClassStatusLogs', async (req, res) => {
       workbook.xlsx.write(res).then(() => res.end());
   } catch(err) {
     res.status(500).json(err.message);
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -639,7 +636,6 @@ router.get('/downloadAccountLogs', async (req, res) => {
         workbook.xlsx.write(res).then(() => res.end());
     } catch(err) {
       res.status(500).json(err.message);
-      console.error(err.message);
     } finally {
       await endConnection(conn);
     }
@@ -819,7 +815,6 @@ router.get('/downloadDeadlineLogs', async (req, res) => {
       workbook.xlsx.write(res).then(() => res.end());
   } catch(err) {
     res.status(500).json(err.message);
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }

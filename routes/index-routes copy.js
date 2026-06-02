@@ -72,7 +72,6 @@ router.get("/getClassGraduateStudiesStudents", async (req, res) => {
     await endConnection(conn);
     res.status(200).json(rows);
   } catch (error) {
-    console.error(error);
     res.status(500).json(error.message);
   }
 });
@@ -188,7 +187,6 @@ router.get("/getClassCodeDetails", async (req, res) => {
     await endConnection(conn);
     res.status(200).json(rows);
   } catch (err) {
-    console.log(err.message);
     res.status(500).json(err.message);
   }
 });
@@ -211,7 +209,6 @@ router.get("/getLastGradeSheetSubmittedLog", async (req, res) => {
     );
     const data = rows.length > 0 ? rows.reverse()[0] : "--";
     const statusCode = rows.length > 0 ? 200 : 404;
-    console.log(data);
     res.status(statusCode).json(data);
   } catch (error) {
     res.status(500).json(error);
@@ -237,7 +234,6 @@ router.get("/getLoad", async (req, res) => {
     const rows = await getLoad(conn, query, params);
     res.json(rows);
   } catch (err) {
-    console.log(err.message);
     res.status(500).json(err.message);
   } finally {
     await endConnection(conn);
@@ -257,7 +253,6 @@ router.get("/getGradeTable", async (req, res) => {
     const rows = await getGradeTable(conn, decode);
     res.status(200).json(rows);
   } catch (err) {
-    console.log(err.message);
     res.status(500).json(err.message);
   } finally {
     await endConnection(conn);
@@ -270,7 +265,6 @@ router.get("/getGraduateStudiesLoad", async (req, res) => {
     const [rows] = await conn.query("SELECT * FROM graduate_studies");
     res.status(200).json(rows);
   } catch (err) {
-    console.log(err.message);
     res.status(500).json(err.message);
   } finally {
     await endConnection(conn);
@@ -288,10 +282,8 @@ router.get("/getGraduateStudiesTable", async (req, res) => {
   const conn = await startConnection(req);
   try {
     const rows = await getGraduateStudiesTable(conn, decode);
-    console.log(rows);
     res.status(200).json(rows);
   } catch (err) {
-    console.log(err.message);
     res.status(500).json(err.message);
   } finally {
     await endConnection(conn);
@@ -535,7 +527,6 @@ router.get("/getExcelFile", async (req, res) => {
     .write(res)
     .then(() => res.end())
     .catch((err) => {
-      console.error("Error writing Excel file:", err);
       res.status(500).send("Error generating Excel file");
     });
 });
@@ -794,7 +785,6 @@ router.post("/updateGraduateStudiesGrade", async (req, res) => {
       );
       return rows.affectedRows;
     } catch (err) {
-      console.error(err.message);
     }
   };
 
@@ -814,7 +804,6 @@ router.post("/updateGraduateStudiesGrade", async (req, res) => {
     );
     res.status(200).json(totalAffectedRows);
   } catch (error) {
-    if (error) console.log(error);
     res.status(500).json(error.message);
   } finally {
     await endConnection(conn);
@@ -841,7 +830,6 @@ router.post("/updateGrade", async (req, res) => {
       const rows = await indexUpdateGrade(conn, grade, modifiedEventKey);
       return rows.affectedRows;
     } catch (err) {
-      console.error({ error: err.message });
     }
   };
 
@@ -862,7 +850,6 @@ router.post("/updateGrade", async (req, res) => {
     await conn.commit();
     res.status(200).json(totalAffectedRows);
   } catch (error) {
-    if (error) console.log(error);
     await conn.rollback();
     res.status(500).json(error.message);
   } finally {
@@ -946,7 +933,6 @@ router.post(
           return rows.changedRows;
         } catch (err) {
           if (err) {
-            console.error({ processRowError: err.message });
           }
         }
       };
@@ -1057,7 +1043,6 @@ router.post(
           return rows.changedRows;
         } catch (err) {
           if (err) {
-            console.error(err.message);
           }
         }
       };
@@ -1103,7 +1088,6 @@ router.post("/submitGradeSheet", async (req, res) => {
       message: "Failed to Update",
       error: err.message,
     };
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }

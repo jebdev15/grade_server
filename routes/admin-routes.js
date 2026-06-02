@@ -37,7 +37,6 @@ router.get('/getCurrentSchedule', async (req, res) => {
       const rows = getCurrentSchedule(conn);
       res.status(200).json(rows)
     } catch(err) {
-      console.error(err.message);
     } finally {
       await endConnection(conn);
     }
@@ -53,7 +52,6 @@ router.get('/getEmails', async (req, res) => {
       const rows = identifyAccessLevel ? await getEmails(conn) : await getEmailsPerCollegeCode(conn, college_code);
       res.status(200).json(rows)
     } catch(err) {
-      console.error(err.message);
     } finally {
       await endConnection(conn);
     }
@@ -70,7 +68,6 @@ router.get('/getAllEmails', async (req, res) => {
     const rows = await getAllEmails(conn);
     res.status(200).json(rows)
   } catch(err) {
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -86,7 +83,6 @@ router.get('/getGradeSubmissionLogs', async (req, res) => {
       res.status(200).json(rows)
     } catch(err) {
       res.status(500).json(err.message);
-      console.error(err.message);
     } finally {
       await endConnection(conn);
     }
@@ -188,7 +184,6 @@ router.post('/saveCollege', async (req, res) => {
       res.status(200).json({message: "Successfully Saved", rows})
     }
   } catch(err) {
-    console.error(err.message);
     res.status(500).json({message: "Unable to Save", error: err.message});
   } finally {
     await endConnection(conn);
@@ -202,7 +197,6 @@ router.get('/getProgramCodes', async (req, res) => {
     const rows = await getProgramCodes(conn);
     res.status(200).json(rows || [])
   } catch(err) {
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -216,7 +210,6 @@ router.get('/getSubjectCodes', async (req, res) => {
     const rows = await getSubjectCodes(conn, curriculum_id);
     res.status(200).json(rows || [])
   } catch(err) {
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -229,7 +222,6 @@ router.post('/saveSubjectCode', async (req, res) => {
     const rows = await saveSubjectCode(conn, subject_code);
     res.status(200).json({message: "Successfully Saved", rows})
   } catch(err) {
-    console.error(err.message);
     res.status(500).json({message: "Unable to Save", error: err.message});
   } finally {
     await endConnection(conn);
@@ -242,7 +234,6 @@ router.get('/getDeadlineLogs', async (req, res) => {
     const rows = await getDeadlineLogs(conn);
     res.status(200).json(rows || [])
   } catch(err) {
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -252,11 +243,9 @@ router.get('/getClassCodeDetails', async (req, res) => {
   const conn = await startConnection(req);
   try {
     const rows = await getClassCodeDetails(conn, req);
-    console.log(rows);
     res.status(200).json(rows || [])
   } catch(err) {
     res.json({message: err.message});
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -269,7 +258,6 @@ router.get('/getClassStudents', async (req, res) => {
     res.status(200).json(rows || [])
   } catch(err) {
     res.json({message: err.message});
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -325,7 +313,6 @@ router.get('/getStudentsInitialData', async (req, res) => {
     res.json(rows || [])
   } catch(err) {
     res.json({message: err.message});
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -338,7 +325,6 @@ router.get('/getStudentYearSemesterAndSchoolYear', async (req, res) => {
     res.json(rows || [])
   } catch(err) {
     res.json({message: err.message});
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -351,7 +337,6 @@ router.get('/getStudentGrades', async (req, res) => {
     res.json(rows || [])
   } catch(err) {
     res.json({message: err.message});
-    console.error(err.message);
   } finally {
     await endConnection(conn);
   }
@@ -363,7 +348,6 @@ router.get("/getSubjectCodesGS", async (req, res) => {
     const [rows] = await conn.query("SELECT * FROM graduate_studies");
     res.status(200).json(rows);
   } catch (err) {
-    console.log(err.message);
     res.status(500).json(err.message);
   } finally {
     await endConnection(conn);
@@ -374,11 +358,9 @@ router.post("/getStudentsBySearch", async (req, res) => {
   const conn = await startConnection(req);
   try {
     const rows = await getStudentsBySearch(conn, req);
-    console.log(rows);
     
     res.json(rows);
   } catch (err) {
-    console.log(err.message);
     res.status(500).json(err.message);
   } finally {
     await endConnection(conn);
@@ -391,7 +373,6 @@ router.get("/getProgramCodesByCampus", async (req, res) => {
     const rows = await getProgramCodesByCampus(conn);
     res.json(rows);
   } catch (err) {
-    console.log(err.message);
     res.json(err.message);
   } finally {
     await endConnection(conn);
@@ -428,7 +409,6 @@ router.get("/getAllEmailsForExtension", async (req, res) => {
       );
       res.json(rows);
   } catch (err) {
-      console.log(err.message);
       res.json(err.message);
   } finally {
       await endConnection(conn);
@@ -450,7 +430,6 @@ const extendUploadingOfGradeByClassCode = async (conn, rowsContainer, email, cla
       }
     }
   } catch (error) {
-    console.log(error)
     return { insertedRows: 0 };
   } 
 }
@@ -461,12 +440,10 @@ const updateClassCodeStatusByClassCode = async (conn, email, class_codes, term_t
 
       if (rows.affectedRows) {
         const { bulkInsertLogsAffectedRows } = await bulkInsertLogs(conn, email, term_type, class_codes.split(","));
-        console.log({ bulkInsertLogsAffectedRows });
         return { insertedRows: bulkInsertLogsAffectedRows };
       }
       return { insertedRows: 0 };
   } catch (error) {
-    console.log(error)
     return { insertedRows: 0 };
   } 
 }
@@ -498,7 +475,6 @@ router.post("/extendUploadingOfGradeByClassCode", async (req, res) => {
     await extendUploadingOfGradeByClassCode(conn, rowsContainer, email, class_codes, deadline_extend_start, deadline_extend_end, school_year, semester)
     res.json({message: "Successfully Added"});
   } catch (err) {
-    console.log(err.message);
     res.json(err.message);
   } finally {
     await endConnection(conn);
@@ -511,10 +487,8 @@ router.put("/updateClassCodeStatusByClassCode", async (req, res) => {
   try {
     const { email } = req.cookies;
     const { insertedRows } = await updateClassCodeStatusByClassCode(conn, email, class_codes, term_type)
-    console.log({ insertedRows })
     res.json({message: insertedRows > 0 ? "Successfully Updated" : "Failed to Update"});
   } catch (err) {
-    console.log(err.message);
     res.json(err.message);
   } finally {
     await endConnection(conn);
@@ -528,7 +502,6 @@ router.post("addGraduateStudiesSubjectCode", async (req, res) => {
     const [rows] = await conn.query(`INSERT INTO graduate_studies (subject_code) VALUES (?)`, [subject_code]);
     res.json(rows);
   } catch (err) {
-    console.log(err.message);
     res.json(err.message);
   } finally {
     await endConnection(conn);

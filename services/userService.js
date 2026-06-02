@@ -30,12 +30,10 @@ const UserService = {
             }
           } catch(err) {
             response = {"success": 0, message: "Unable to Create.", error: err.message}
-            console.error(err.message);
           } finally {
             await endConnection(conn);
           }
         } else {
-          console.log("Please use a chmsu email address");
           response = {"success": 0, message: "Please use a chmsu email address"};
         }
         return response;
@@ -92,7 +90,6 @@ const UserService = {
           newFacultyId = newData.faculty_id;
         }
         const dataComparison = compareTwoObjects(oldData, newData);
-        console.log(dataComparison);
         let response = {};
         if(dataComparison.length > 0) {
           const rowEmailLogsParam = [
@@ -125,7 +122,6 @@ const UserService = {
               response = {"success": 0, message: "Failed to Update", changes: updateEmail.changedRows}
             }
           } catch(err) {
-            console.error(err.message);
           } finally {
             await endConnection(conn);
           }

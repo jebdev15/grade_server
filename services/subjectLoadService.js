@@ -30,13 +30,11 @@ const SubjectLoadService = {
             if(rows.changedRows > 0) {
               const logClassStatus = await insertClassCodeUpdateLog(conn, email_used, newStatus, classCodeDecode);
               response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status", newStatus} : {"success": false ,"message": "Failed to Update Status", newStatus: status}
-              console.log(classCodeDecode);
             } else {
                 response = {"success": false ,"message": "Status Updated", newStatus: status}
             }
             return response;
         } catch(err) {
-            console.error(err.message);
             return {"success": false ,"message": "Failed to Update", "error": err.message, newStatus: status};
         } finally {
           await endConnection(conn);
@@ -51,7 +49,6 @@ const SubjectLoadService = {
       try {
           let response = {};
           const rows = await updateMidtermClassStatusByClassCode(conn, newStatus, classCodeDecode);
-          console.log(rows);
           if(rows.changedRows > 0) {
             const logClassStatus = await insertMidtermClassCodeUpdateLog(conn, email_used, newStatus, classCodeDecode);
             response = logClassStatus.affectedRows > 0 ? {"success": true ,"message": "Successfully Updated Status", newStatus} : {"success": false ,"message": "Failed to Update", newStatus: status}
@@ -60,7 +57,6 @@ const SubjectLoadService = {
           }
           return response;
       } catch(err) {
-          console.error(err.message);
           return {"success": false ,"message": "Failed to Update", "error": err.message, newStatus: status};
       } finally {
         await endConnection(conn);

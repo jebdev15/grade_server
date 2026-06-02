@@ -110,15 +110,12 @@ const populateSheetContent = (sheet, columns, headers, rows, formatRowFn) => {
 };
 
 const getAcademicTerm = (schoolYear, currentSemester) => {
-  console.log({ schoolYear, currentSemester });
   if (
     currentSemester === "First Semester" ||
     currentSemester === "Second Semester"
   ) {
-    console.log(`Academic Term: ${schoolYear} - ${parseInt(schoolYear) + 1}, ${currentSemester}`)
     return `Academic Term: ${schoolYear} - ${parseInt(schoolYear) + 1}, ${currentSemester}`;
   }
-  console.log(`Academic Term: ${schoolYear}, ${currentSemester}`)
   return `Academic Term: ${schoolYear}, ${currentSemester}`;
 };
 

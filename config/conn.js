@@ -32,21 +32,18 @@ const startConnection = async (req) => {
   const dbPass = DB_PASSWORD[index];
 
   if (index >= 0) {
-    console.log(`DB Name: ${dbName}`);
   }
   try {
     const pool = getPool(index, dbHost, dbName, dbUser, dbPass);
     const conn = await pool.getConnection(); // <-- Get a connection from the pool
     return conn;
   } catch (error) {
-    console.error(`ERRDB. - ${error.message}`);
     throw new Error("Failed to connect to the database.");
   }
 };
 
 const endConnection = async (conn) => {
   await conn.release(); // <-- Release the connection back to the pool
-  console.log("Connection Released.");
 };
 
 module.exports = {

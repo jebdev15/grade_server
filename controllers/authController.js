@@ -7,7 +7,7 @@ const AuthController = {
         const conn = await startConnection(req);
         try {
             const { status, response } = await AuthService.login(conn, req)
-            if(NODE_ENV === 'production') {
+            if(NODE_ENV === 'production' || NODE_ENV === 'staging') {
                 // Loop through the response object and set each value as a cookie
                 if(status === 200) {
                     response.rows.map(({ name, value}) => {
@@ -26,7 +26,6 @@ const AuthController = {
                 res.status(status).json(response);
             }
         } catch (error) {
-            console.log({error});
             res.json({message: error.message, email: req.body.email});
         } finally {
             await endConnection(conn);

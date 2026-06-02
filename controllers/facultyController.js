@@ -7,7 +7,6 @@ const FacultyController = {
             res.status(200).json({rows, error: null});
           } catch(err) {
             res.status(500).json({rows: [], error: err.message});
-            console.error(err.message);
           }
     }
 }

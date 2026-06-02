@@ -186,7 +186,6 @@ const updateCreditsForPassedStudents = async (conn, filter) => {
       AND sg.semester = ?;`,
     [filter.school_year, filter.semester]
   );
-  console.log({ updateFunction: rows });
   return rows;
 };
 
@@ -268,7 +267,6 @@ const updateGradeRow = async (conn, data) => {
     modified_eventkey,
     subject_code,
   } = data;
-  console.log({
     student_grades_id,
     mid_grade,
     final_grade,

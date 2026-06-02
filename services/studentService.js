@@ -13,7 +13,6 @@ const StudentService = {
           const rows = await getGradeTableService(conn, decode);
           return rows;
         } catch (err) {
-          console.log(err.message);
         } finally {
           await endConnection(conn);
         }

@@ -14,7 +14,6 @@ const generateReport = async (req, res) => {
     );
     res.send(reportBuffer);
   } catch (err) {
-    console.error("Failed to generate report:", err.message);
     res.status(500).send("Failed to generate report");
   }
 };

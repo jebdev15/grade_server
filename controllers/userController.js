@@ -7,7 +7,6 @@ const UserController = {
           res.json(response)
         } catch (error) {
           response = {"success": 0, message: "Unable to Create.", error: err.message}
-          console.error(err.message);
         }
     },
     updateUser: async (req, res) => {
@@ -15,7 +14,6 @@ const UserController = {
             const response = await UserService.updateUser(req);
             res.json(response)
         } catch (error) {
-            console.error(error.message);
             res.json({message: "Failed to Update", error: error.message});
         }
     }
