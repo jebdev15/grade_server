@@ -1,6 +1,7 @@
 const verifyToken = require("../middlewares/verifyToken");
 
 const setupRoutes = (app) => {
+  app.get("/health", (req, res) => res.status(200).send("ok"));
   app.use("/auth", require("./auth-routes"));
   app.use(verifyToken); // this will verify the token before proceeding except auth route
   app.use("/", require("./index-routes"));
