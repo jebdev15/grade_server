@@ -6,7 +6,7 @@ const corsOptions = require('./config')
 
 module.exports = (app) => {
   app.enable('trust proxy');
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "staging") {
     app.use(logger("combined"));
   }
   app.use(corsOptions);
