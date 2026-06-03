@@ -6,60 +6,46 @@ const getLoad = async (conn, query, params) => {
   try {
     const [rows] = await conn.query(
       `SELECT
-    c.class_code,
+    c.class_code, 
     c.subject_code,
     CONCAT(s.program_code, ' ', s.yearlevel, ' - ', s.section_code) AS section,
-    COALESCE(sl.noStudents, 0) AS noStudents,
-    u.midterm_timestamp,
-    u.endterm_timestamp,
-    ul.midterm_submitted_timestamp,
-    ul.endterm_submitted_timestamp,
+    COUNT(DISTINCT sl.student_id) AS noStudents,
+
+    MAX(CASE WHEN u.term_type = 'midterm' THEN u.timestamp END) AS midterm_timestamp,
+    MAX(CASE WHEN u.term_type = 'endterm' THEN u.timestamp END) AS endterm_timestamp,
+    MAX(CASE WHEN ul.action_type = 'Submitted' AND ul.term_type = 'midterm' THEN ul.timestamp END) AS midterm_submitted_timestamp,
+    MAX(CASE WHEN ul.action_type = 'Submitted' AND ul.term_type = 'endterm' THEN ul.timestamp END) AS endterm_submitted_timestamp,
+    -- Check if the subject belongs to graduate studies
     EXISTS (
         SELECT 1 FROM graduate_studies gs WHERE gs.subject_code = c.subject_code
     ) AS isGraduateStudies,
-    COALESCE(uge.is_deadline_extended, 0) AS is_deadline_extended,
+
+    MAX(CASE 
+        WHEN uge.status = 'approved' AND uge.deadline_extend_end >= CURDATE() THEN TRUE 
+        ELSE FALSE 
+    END) AS is_deadline_extended,
     CONCAT(rao.term_type,'_','status') AS term_type,
-    CASE WHEN rao.term_type = 'midterm' THEN CAST(ccs.midterm_status AS UNSIGNED) ELSE CAST(ccs.endterm_status AS UNSIGNED) END AS classLoadStatus,
-    CASE
-      WHEN COALESCE(uge.is_deadline_extended, 0) = 1
-        OR (rao.to >= CURDATE() AND CONCAT(rao.term_type,'_','status') <> 1)
-      THEN TRUE
-      ELSE FALSE
-    END AS canUpload
+    CASE WHEN rao.term_type = 'midterm' THEN ccs.midterm_status ELSE ccs.endterm_status END AS classLoadStatus,
+    MAX(CASE 
+          WHEN uge.status = 'approved' 
+          AND uge.deadline_extend_end >= CURDATE() 
+          OR (rao.to >= CURDATE() AND CONCAT(rao.term_type,'_','status') <> 1)
+          THEN TRUE 
+          ELSE FALSE 
+    END) AS canUpload
 FROM class c
 LEFT JOIN section s ON c.section_id = s.section_id
-LEFT JOIN (
-    SELECT class_code, COUNT(DISTINCT student_id) AS noStudents
-    FROM student_load
-    WHERE status = '2'
-    GROUP BY class_code
-) sl ON sl.class_code = c.class_code
-LEFT JOIN (
-    SELECT class_code,
-      MAX(CASE WHEN term_type = 'midterm' THEN timestamp END) AS midterm_timestamp,
-      MAX(CASE WHEN term_type = 'endterm' THEN timestamp END) AS endterm_timestamp
-    FROM updates
-    GROUP BY class_code
-) u ON u.class_code = c.class_code
-LEFT JOIN (
-    SELECT class_code,
-      MAX(CASE WHEN action_type = 'Submitted' AND term_type = 'midterm' THEN timestamp END) AS midterm_submitted_timestamp,
-      MAX(CASE WHEN action_type = 'Submitted' AND term_type = 'endterm' THEN timestamp END) AS endterm_submitted_timestamp
-    FROM tbl_class_update_logs
-    GROUP BY class_code
-) ul ON ul.class_code = c.class_code
-LEFT JOIN (
-    SELECT class_code,
-      MAX(CASE WHEN status = 'approved' AND deadline_extend_end >= CURDATE() THEN 1 ELSE 0 END) AS is_deadline_extended
-    FROM upload_grade_extensions
-    GROUP BY class_code
-) uge ON uge.class_code = c.class_code
+LEFT JOIN student_load sl ON c.class_code = sl.class_code
+LEFT JOIN updates u ON u.class_code = c.class_code
+LEFT JOIN upload_grade_extensions uge ON uge.class_code = c.class_code
+LEFT JOIN tbl_class_update_logs ul ON ul.class_code = c.class_code
 LEFT JOIN class_code_status ccs ON ccs.class_code = c.class_code
 LEFT JOIN registrar_activity_online rao ON c.school_year = rao.schoolyear AND c.semester = rao.semester
 WHERE c.faculty_id = ?
   AND c.school_year = ?
   AND c.semester = ?
 ${query}
+GROUP BY c.class_code
 ORDER BY section;`, params
     );
     return rows;
