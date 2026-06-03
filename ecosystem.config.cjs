@@ -1,7 +1,11 @@
+require("dotenv").config();
+
+const prefix = process.env.NODE_ENV ?? "default";
+
 module.exports = {
   apps: [
     {
-      name: "grading-portal-api",         // ✅ Matches PM2 name in deploy-backend.yml
+      name: `${prefix}-grading-portal-api`,         // ✅ Matches PM2 name in deploy-backend.yml
       script: "./app.js",           // ✅ Uses app.js entrypoint
       instances: 1,                        // ✅ Use 1 for cPanel shared hosting (max may exceed limits)
       exec_mode: "fork",                   // ✅ Use fork for cPanel (cluster may not be supported)
