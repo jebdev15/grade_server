@@ -25,7 +25,13 @@ const getLoad = async (conn, query, params) => {
         ELSE FALSE 
     END) AS is_deadline_extended,
     CONCAT(rao.term_type,'_','status') AS term_type,
-    CASE WHEN rao.term_type = 'midterm' THEN ccs.midterm_status ELSE ccs.endterm_status END AS classLoadStatus,
+    CAST(
+        CASE 
+            WHEN rao.term_type = 'midterm' 
+                THEN ccs.midterm_status 
+            ELSE ccs.endterm_status 
+        END AS UNSIGNED
+    ) AS classLoadStatus,
     MAX(CASE 
           WHEN uge.status = 'approved' 
           AND uge.deadline_extend_end >= CURDATE() 

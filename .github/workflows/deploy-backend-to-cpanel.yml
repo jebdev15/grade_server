@@ -63,8 +63,8 @@ jobs:
             # ---------------------------------------------------------------------------
             # CORS / Allowed Origins
             # ---------------------------------------------------------------------------
-            ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
-            FRONT_URLS=${{ secrets.ALLOWED_ORIGINS }}
+            ALLOWED_ORIGINS=${{ secrets.STAGING_ALLOWED_ORIGINS }}
+            FRONT_URLS=${{ secrets.STAGING_ALLOWED_ORIGINS }}
 
             # ---------------------------------------------------------------------------
             # Database configuration
@@ -75,13 +75,13 @@ jobs:
             # Any value left empty falls back to the shared credentials above.
 
             # Staging
-            DB_HOST=${{ secrets.DB_HOST }}
-            DB_NAME=${{ secrets.DB_NAME }}
-            DB_USER=${{ secrets.DB_USER }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_HOST=${{ secrets.STAGING_DB_HOST }}
+            DB_NAME=${{ secrets.STAGING_DB_NAME }}
+            DB_USER=${{ secrets.STAGING_DB_USER }}
+            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}
 
             # JWT and Google reCAPTCHA configuration
-            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            JWT_SECRET_KEY=${{ secrets.STAGING_JWT_SECRET_KEY }}
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
 
             EOF

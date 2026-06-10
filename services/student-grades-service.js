@@ -4,7 +4,7 @@ const { startConnection, endConnection } = require("../config/conn");
 const model = require("../models/student-grades-model");
 const gradeFormatterUtil = require("../utils/grade-formatter-util");
 const { urlDecode } = require("url-encode-base64");
-const failureListService = require("../modules/shared/failure-list/failure-list.service");
+const failureListService = require("@shared/failure-list/services/failure-list.service");
 
 // Faculty - Student Grades
 const getStudents = async (req) => {

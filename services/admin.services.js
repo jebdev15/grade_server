@@ -86,7 +86,13 @@ const getSubjectLoad = async (conn, sqlParams, params) => {
                 THEN true
                 ELSE false
             END as isGraduate,
-            CASE WHEN rao.term_type = 'midterm' THEN ccs.midterm_status ELSE ccs.endterm_status END as classLoadStatus,
+            CAST(
+                CASE 
+                    WHEN rao.term_type = 'midterm' 
+                        THEN ccs.midterm_status 
+                    ELSE ccs.endterm_status 
+                END AS UNSIGNED
+            ) AS classLoadStatus,
             MAX(CASE WHEN uge.status = 'approved' AND uge.deadline_extend_end THEN uge.deadline_extend_end END) as deadline_extended,
             MAX(CASE WHEN uge.status = 'approved' AND uge.deadline_extend_end >= CURDATE() THEN TRUE ELSE FALSE END) as is_deadline_extended
         FROM 

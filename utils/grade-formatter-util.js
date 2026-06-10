@@ -143,9 +143,8 @@ const getCredits = (grade, academic_level) => {
 
 const getRemark = (data, grade, academic_level) => {
   const status = data.status?.toLowerCase() || '';
-  const remark = data.remark?.trim();
+  const remark = String(data.remark || data[5] || data.dbRemark || data.remarks || '').trim();
   const arrayOfRemarks = ["Incomplete", "Dropped", "No Attendance", "No Grade", "Withdrawn"];
-
   if (academic_level === "undergraduate") {
     if (grade > 74 || status === "passed") return { finalRemark: "passed" };
   } else {
@@ -153,7 +152,6 @@ const getRemark = (data, grade, academic_level) => {
       return { finalRemark: "passed" };
     }
   }
-
   if (arrayOfRemarks.includes(remark)) {
     let remarks = "";
     switch (remark) {
@@ -165,7 +163,7 @@ const getRemark = (data, grade, academic_level) => {
         break;
       case "No Attendance":
         remarks = "na";
-        break; // <-- You missed this
+        break;
       case "No Grade":
         remarks = "ng";
         break;

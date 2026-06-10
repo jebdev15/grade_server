@@ -32,14 +32,14 @@ const { SPECIAL_REMARKS } = require("../config/failure-list.config");
 const getFailureListPolicy = async (conn, classCode, termType) => {
   const normalizedTermType = normalizeTermType(termType);
   const classInfo = await findClassByCode(conn, classCode);
-  
+
   if (!classInfo) {
     return { isApplicable: false, reason: "class_not_found" };
   }
 
   const isGraduate = await isGraduateSubject(conn, classInfo.subject_code);
   const isApplicable = !isGraduate && isUndergradProgram(classInfo.program_code);
-  
+
   if (!isApplicable) {
     return { isApplicable: false, reason: "program_not_supported" };
   }
@@ -79,7 +79,9 @@ const getFailureListPolicy = async (conn, classCode, termType) => {
   );
 
   return {
-    isApplicable: true,
+    isApplicable: !!window && isApplicable && today >= startDate,
+    isApplicable2: isApplicable,
+    isWithinWindow: today >= startDate && today <= endDate,
     classInfo,
     window,
     list,
@@ -102,13 +104,13 @@ const getFailureListPolicy = async (conn, classCode, termType) => {
  * @returns {Object} Grade data (unchanged if valid)
  * @throws {Error} If grade violates policy
  */
-const enforceFailureListPolicy = (policy, gradeData, contextLabel) => {
-  if (!policy?.isApplicable || !policy.isWindowClosed || !policy.isSubmitted) {
-    return gradeData;
-  }
-
-  const remarks = String(gradeData.remarks || "").toLowerCase();
-  if (SPECIAL_REMARKS.has(remarks)) {
+const enforceFailureListPolicy = (
+  policy,
+  gradeData,
+  contextLabel,
+  options = {}
+) => {
+  if (!policy?.isApplicable) {
     return gradeData;
   }
 
@@ -116,18 +118,44 @@ const enforceFailureListPolicy = (policy, gradeData, contextLabel) => {
     policy.studentGradeIds.has(gradeData.student_grades_id) ||
     policy.studentIds.has(gradeData.student_id);
 
-  const hasFailingMid =
-    Number(gradeData.mid_grade) > 0 && Number(gradeData.mid_grade) < 75;
-  const hasFailingFinal =
-    Number(gradeData.final_grade) > 0 && Number(gradeData.final_grade) < 75;
-  const hasFailingAverage =
-    Number(gradeData.grade) > 0 && Number(gradeData.grade) < 75;
+  const remarks = String(
+    gradeData.remarks || gradeData.dbRemark || gradeData.remark || ""
+  ).toLowerCase();
+  if (SPECIAL_REMARKS.has(remarks)) {
+    if (options.restrictSpecialRemarksToListed && !isListed) {
+      throw new Error(
+        "The List of Failures is now active. Special remarks (e.g., Incomplete, Dropped, No Attendance, No Grade, and Withdrawn) are only allowed for highlighted rows. Please ensure that special remarks are entered only for students included in the highlighted rows to avoid submission errors."
+      );
+    }
+    return gradeData;
+  }
 
-  if (!isListed && (hasFailingMid || hasFailingFinal || hasFailingAverage)) {
-    const label = contextLabel ? ` (${contextLabel})` : "";
-    throw new Error(
-      `List of Failures is finalized. Failing grades are only allowed for listed students${label}.`
-    );
+  const mid = Number(gradeData.mid_grade || 0);
+  const finalGrade = Number(gradeData.final_grade || 0);
+  const averageGrade = Number(gradeData.grade || 0) || (mid > 0 && finalGrade > 0 ? Math.round((mid + finalGrade) / 2) : 0);
+
+  const hasFailingAverage = averageGrade > 0 && averageGrade < 75;
+  const hasPassingAverage = averageGrade >= 75;
+
+  const label = contextLabel ? ` (${contextLabel})` : "";
+
+  if (!isListed) {
+    const hasFailing = hasFailingAverage;
+    if (hasFailing) {
+      throw new Error(
+        "The List of Failures is now active. Only students included in the highlighted rows are allowed to receive failing grades. Please review your entries carefully before submitting grades to avoid submission errors."
+      );
+    }
+  }
+
+  if (isListed) {
+    const hasPassing = hasPassingAverage;
+
+    if (hasPassing) {
+      throw new Error(
+        `The List of Failures is now active. Students in the highlighted rows must receive failing grades. Please review your entries carefully before submitting grades to avoid submission errors.`
+      );
+    }
   }
 
   return gradeData;
@@ -160,7 +188,7 @@ const applyAutoPassForNonListed = async (
  */
 const getFailureListRoster = async (conn, classCode, termType) => {
   const policy = await getFailureListPolicy(conn, classCode, termType);
-  
+
   if (!policy.isApplicable) {
     return { policy, students: [] };
   }
