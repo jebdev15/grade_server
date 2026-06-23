@@ -66,12 +66,12 @@ const fetchUndergradStudents = async (conn, { class_code, school_year, semester 
           CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as name, 
           CASE 
             WHEN sg.mid_grade = 0 THEN '' 
-            WHEN sg.mid_grade BETWEEN 1 AND 5 THEN FORMAT(sg.mid_grade,2) 
+            WHEN sg.mid_grade < 65 THEN 65
             ELSE FORMAT(sg.mid_grade,0) 
           END as mid_grade, 
           CASE 
             WHEN sg.final_grade = 0 THEN ''
-            WHEN sg.final_grade BETWEEN 1 AND 5 THEN FORMAT(sg.final_grade,2) 
+            WHEN sg.final_grade < 65 THEN 65 
             ELSE FORMAT(sg.final_grade,0) 
           END as final_grade, 
           sg.remarks as dbRemark,

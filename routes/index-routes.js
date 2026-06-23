@@ -92,16 +92,17 @@ router.get("/getClassStudents", async (req, res) => {
         CONCAT(s.student_lastname , ', ', s.student_firstname, ' ', s.student_middlename) as studentName, 
         CASE 
           WHEN sg.mid_grade = 0 THEN '' 
-          WHEN sg.mid_grade BETWEEN 1 AND 3 THEN FORMAT(sg.mid_grade,2)
+          WHEN sg.mid_grade < 65 THEN 65
           ELSE FORMAT(sg.mid_grade,0) 
         END as midTermGrade, 
         CASE 
           WHEN sg.final_grade = 0 THEN '' 
-          WHEN sg.final_grade BETWEEN 1 AND 3 THEN FORMAT(sg.final_grade,2)
+          WHEN sg.final_grade < 65 THEN 65
           ELSE FORMAT(sg.final_grade,0) 
         END as endTermGrade, 
         CASE 
           WHEN sg.grade = 0 THEN '' 
+          WHEN sg.grade < 65 THEN 65
           ELSE FORMAT(sg.grade, 0) 
         END as finalGrade, 
         sg.remarks
@@ -223,13 +224,15 @@ router.get("/getLoad", async (req, res) => {
   const query = class_code ? `AND c.class_code = ?` : "";
   const params = class_code
     ? [
-        urlDecode(faculty_id),
-        urlDecode(school_year),
-        urlDecode(semester),
-        urlDecode(class_code),
-      ]
+      urlDecode(faculty_id),
+      urlDecode(school_year),
+      urlDecode(semester),
+      urlDecode(class_code),
+    ]
     : [urlDecode(faculty_id), urlDecode(school_year), urlDecode(semester)];
+
   const conn = await startConnection(req);
+
   try {
     const rows = await getLoad(conn, query, params);
     res.json(rows);
@@ -413,9 +416,8 @@ router.get("/getExcelFile", async (req, res) => {
   gradeSheetTitle.value = "Student Grade Sheet";
   sheet.mergeCells("A7", "H7");
   const classInfo = sheet.getCell("A7");
-  classInfo.value = `${semesterWord}, A.Y. ${decode.currentSchoolYear} - ${
-    parseInt(decode.currentSchoolYear) + 1
-  }`;
+  classInfo.value = `${semesterWord}, A.Y. ${decode.currentSchoolYear} - ${parseInt(decode.currentSchoolYear) + 1
+    }`;
   classInfo.alignment = {
     vertical: "middle",
     horizontal: "center",
@@ -436,7 +438,7 @@ router.get("/getExcelFile", async (req, res) => {
   };
 
   const sectionCode = sheet.getCell("E10");
-  sectionCode.value = `CURR/ YR/ SEC: ${decodeURI(classSection)}`;
+  sectionCode.value = `PROGRAM/ YR/ SEC: ${decodeURI(classSection)}`;
   sectionCode.font = {
     bold: true,
     size: 13,
@@ -674,9 +676,8 @@ router.get("/getGSExcelFile", async (req, res) => {
   gradeSheetTitle.value = "Student Grade Sheet";
   sheet.mergeCells("A7", "H7");
   const classInfo = sheet.getCell("A7");
-  classInfo.value = `${semesterWord}, A.Y. ${decode.currentSchoolYear} - ${
-    parseInt(decode.currentSchoolYear) + 1
-  }`;
+  classInfo.value = `${semesterWord}, A.Y. ${decode.currentSchoolYear} - ${parseInt(decode.currentSchoolYear) + 1
+    }`;
   classInfo.alignment = {
     vertical: "middle",
     horizontal: "center",
@@ -851,7 +852,7 @@ router.post("/updateGraduateStudiesGrade", async (req, res) => {
 router.post("/updateGrade", async (req, res) => {
   const ipAddress = req.ip;
   const { grades, class_code, method, email_used, term_type } = req.body;
-  
+
   const conn = await startConnection(req); // Start DB Connection
   await conn.beginTransaction(); // Begin Transaction
   const countAffectedRows = async (grade) => {
@@ -992,7 +993,7 @@ router.post(
         "INSERT INTO updates(class_code, method, term_type) VALUES(?, ?, ?)",
         [decodeClassCode, method, term_type]
       );
-      
+
       await conn.commit();
       res
         .status(200)

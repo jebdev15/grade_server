@@ -59,13 +59,17 @@ const updateStudentGrade = async (req) => {
 
     for (const grade of grades) {
       const processedGradeData = gradeFormatterUtil.processedEncodedRow(grade, req.params.academic_level);
+      if (req.params.academic_level === "undergraduate" && [processedGradeData.mid_grade, processedGradeData.final_grade, processedGradeData.grade].some(value => Number(value) > 0 && Number(value) < 65)) {
+        throw new Error('Grades below 65 are not allowed to be uploaded. Please review the grade entries and upload again.');
+        await conn.rollback();
+      }
       const policyReadyData = failurePolicy
         ? failureListService.enforceFailureListPolicy(
-            failurePolicy,
-            { ...processedGradeData, student_id: grade.student_id },
-            grade.name || grade.student_id || grade.sg_id,
-            { restrictSpecialRemarksToListed: true }
-          )
+          failurePolicy,
+          { ...processedGradeData, student_id: grade.student_id },
+          grade.name || grade.student_id || grade.sg_id,
+          { restrictSpecialRemarksToListed: true }
+        )
         : processedGradeData;
       const credit = policyReadyData.hasCredits ? subjectCredit : 0;
 
@@ -160,8 +164,12 @@ const uploadExcel = async (req) => {
     for (let i = 14; i <= sheet.rowCount; i++) {
       const row = sheet.getRow(i);
       const rowData = gradeFormatterUtil.extractRowData(row);
-      if(!rowData[0]) continue;
+      if (!rowData[0]) continue;
       const processedUploadRow = gradeFormatterUtil.processGradeRow(rowData, req.params.academic_level);
+      if (req.params.academic_level === "undergraduate" && [processedUploadRow.mid_grade, processedUploadRow.final_grade, processedUploadRow.grade].some(value => Number(value) > 0 && Number(value) < 65)) {
+        throw new Error('Grades below 65 are not allowed to be uploaded. Please review the grade entries and upload again.');
+        await conn.rollback();
+      }
       if (failurePolicy) {
         failureListService.enforceFailureListPolicy(
           failurePolicy,
@@ -227,7 +235,7 @@ const updateEncodedRow = async (
     academic_level
   );
   const { hasCredits, ...filteredData } = processedData;
-  const result = await updateGradeById(conn, {...filteredData, credit: hasCredits ? credit : 0, modified_eventkey });
+  const result = await updateGradeById(conn, { ...filteredData, credit: hasCredits ? credit : 0, modified_eventkey });
   return result;
 };
 
@@ -406,7 +414,7 @@ const updateStudentGrades = async (req) => {
     );
 
     await model.insertUpdateLog(conn, class_code, "Manual", term_type); // Insert update log in updates table
-    if(totalAffectedRows < 1) {
+    if (totalAffectedRows < 1) {
       await conn.rollback();
       throw new Error("No rows were updated");
     }
