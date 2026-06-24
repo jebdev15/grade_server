@@ -60,8 +60,8 @@ const updateStudentGrade = async (req) => {
     for (const grade of grades) {
       const processedGradeData = gradeFormatterUtil.processedEncodedRow(grade, req.params.academic_level);
       if (req.params.academic_level === "undergraduate" && [processedGradeData.mid_grade, processedGradeData.final_grade, processedGradeData.grade].some(value => Number(value) > 0 && Number(value) < 65)) {
-        throw new Error('Grades below 65 are not allowed to be uploaded. Please review the grade entries and upload again.');
         await conn.rollback();
+        throw new Error('Grades below 65 are not allowed to be uploaded. Please review the grade entries and upload again.');
       }
       const policyReadyData = failurePolicy
         ? failureListService.enforceFailureListPolicy(
@@ -167,8 +167,8 @@ const uploadExcel = async (req) => {
       if (!rowData[0]) continue;
       const processedUploadRow = gradeFormatterUtil.processGradeRow(rowData, req.params.academic_level);
       if (req.params.academic_level === "undergraduate" && [processedUploadRow.mid_grade, processedUploadRow.final_grade, processedUploadRow.grade].some(value => Number(value) > 0 && Number(value) < 65)) {
-        throw new Error('Grades below 65 are not allowed to be uploaded. Please review the grade entries and upload again.');
         await conn.rollback();
+        throw new Error(`Grades below 65 are not allowed (row ${i}) to be uploaded. Please review the grade entries and upload again.`);
       }
       if (failurePolicy) {
         failureListService.enforceFailureListPolicy(
