@@ -142,16 +142,22 @@ const getCredits = (grade, academic_level) => {
 };
 
 const getRemark = (data, grade, academic_level) => {
-  const status = data.status?.toLowerCase() || '';
+  const status = data.status?.toLowerCase() || (typeof data[4] === 'string' ? data[4].toLowerCase().trim() : '');
   const remark = String(data.remark || data[5] || data.dbRemark || data.remarks || '').trim();
   const arrayOfRemarks = ["Incomplete", "Dropped", "No Attendance", "No Grade", "Withdrawn"];
+
   if (academic_level === "undergraduate") {
     if (grade > 74 || status === "passed") return { finalRemark: "passed" };
+    if (grade > 0 && grade < 75) return { finalRemark: "failed" };
   } else {
     if ((grade >= 1 && grade <= 2) || status === "passed") {
       return { finalRemark: "passed" };
     }
+    if (grade > 2 || status === "failed") {
+      return { finalRemark: "failed" };
+    }
   }
+
   if (arrayOfRemarks.includes(remark)) {
     let remarks = "";
     switch (remark) {
@@ -176,7 +182,9 @@ const getRemark = (data, grade, academic_level) => {
     return { finalRemark: remarks };
   }
 
-  return { finalRemark: status || "failed" }; // Default to "failed" if undefined
+  // If average, status, and remark are blank/empty (e.g. single term grade like midterm only),
+  // remarks in DB must remain blank/empty string and never default to "failed".
+  return { finalRemark: "" };
 };
 
 
@@ -267,6 +275,45 @@ const extractRowData = (row) => ([
 ]);
 
 const compareStudentGradeData = (current, incoming) => {
+  const comparisonResult = {
+    student_grades_id: {
+      current: current.student_grades_id,
+      incoming: incoming.student_grades_id
+    }, mid_grade: {
+      current: current.mid_grade,
+      incoming: incoming.mid_grade
+    },
+    final_grade: {
+      current: current.final_grade,
+      incoming: incoming.final_grade
+    },
+    grade: {
+      current: current.grade,
+      incoming: incoming.grade
+    },
+    remarks: {
+      current: current.remarks,
+      incoming: incoming.remarks,
+      normalizeValueCurrent: normalizeValue(current.remarks),
+      normalizeValueIncoming: normalizeValue(incoming.remarks)
+    },
+    hasCredits: {
+      current: current.hasCredits,
+      incoming: incoming.hasCredits
+    }
+
+  }
+  const comparisonResultWithStrictEqualResult = (
+    current.student_grades_id === incoming.student_grades_id &&
+    current.mid_grade === incoming.mid_grade &&
+    current.final_grade === incoming.final_grade &&
+    current.grade === incoming.grade &&
+    normalizeValue(current.remarks) === normalizeValue(incoming.remarks) &&
+    current.credit === incoming.credit
+  );
+
+  console.log("compare student grade data result: ", comparisonResult);
+  console.log("comparison result with strict equal: ", comparisonResultWithStrictEqualResult);
   return (
     current.student_grades_id === incoming.student_grades_id &&
     current.mid_grade === incoming.mid_grade &&
