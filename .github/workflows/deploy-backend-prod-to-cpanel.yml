@@ -15,7 +15,7 @@ concurrency:
 jobs:
   deploy-backend:
     name: ⚙️ Deploy CHMSU Grading Portal Production Backend & Restart PM2
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     # Steps to deploy the backend API
     steps:
